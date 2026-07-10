@@ -1,0 +1,22 @@
+# Starship — front controller + protection
+RewriteEngine On
+RewriteBase /web/globe-starship/
+
+# Block direct access to sensitive dirs
+RewriteRule ^config/ - [F]
+RewriteRule ^storage/ - [F]
+RewriteRule ^src/ - [F]
+
+# db/ holds schema + token-guarded migrate/seed runners (no secrets); left reachable
+# so the one-time web migration can run. Its runners require the app_key token.
+
+# api/ and cron/ are real .php files and resolve directly (skipped by the -f check below)
+# Everything else that is not a real file/dir routes to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L,QSA]
+
+# Never serve config or dotfiles even if rewrite is off
+<FilesMatch "^(config\.php|config\.sample\.php|\.env)$">
+  Require all denied
+</FilesMatch>

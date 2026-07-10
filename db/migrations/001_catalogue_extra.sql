@@ -1,0 +1,2 @@
+-- (Superseded) category + unit_price are now part of the base SQLite schema.
+-- Kept as a no-op so the migrations runner has nothing to apply here.

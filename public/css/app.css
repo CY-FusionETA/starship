@@ -1,0 +1,108 @@
+:root{
+  --fe-primary:#1A2E6F; --fe-primary-2:#2D4DB3; --fe-accent:#FF6B35;
+  --fe-light:#F4F6FB; --fe-white:#fff; --fe-text:#1C2B3A; --fe-muted:#6B7A8D;
+  --fe-border:#E2E8F0; --fe-success:#22C55E; --fe-warn:#F59E0B; --fe-danger:#EF4444;
+  --fe-grad:linear-gradient(135deg,#1A2E6F 0%,#2D4DB3 100%);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.08); --shadow-md:0 4px 16px rgba(26,46,111,.10);
+  --radius:12px; --radius-btn:8px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fe-light);color:var(--fe-text);
+  font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.6}
+h1,h2,h3{font-family:'Plus Jakarta Sans',Inter,sans-serif;margin:0 0 .4em}
+h1{font-size:1.8rem;font-weight:800} h2{font-size:1.3rem;font-weight:700}
+a{color:var(--fe-primary-2);text-decoration:none} a:hover{text-decoration:underline}
+
+/* Layout shell */
+.app{display:flex;min-height:100vh}
+.sidebar{width:230px;background:var(--fe-grad);color:#fff;padding:1.25rem 0;flex-shrink:0}
+.sidebar .brand{font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.15rem;
+  padding:.2rem 1.25rem 1rem;display:flex;align-items:center;gap:.5rem}
+.sidebar .brand .logo{background:#fff;color:var(--fe-primary);border-radius:7px;
+  width:30px;height:30px;display:grid;place-items:center;font-weight:900;font-size:.85rem}
+.sidebar nav a{display:block;color:#dbe4ff;padding:.6rem 1.25rem;font-size:.95rem;font-weight:500}
+.sidebar nav a:hover,.sidebar nav a.active{background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+.sidebar .tag{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;
+  color:#9db0e8;padding:1rem 1.25rem .3rem}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid var(--fe-border);padding:.8rem 1.5rem;
+  display:flex;justify-content:space-between;align-items:center}
+.topbar .who{color:var(--fe-muted);font-size:.9rem}
+.content{padding:1.5rem;flex:1}
+
+/* Cards / tables */
+.card{background:#fff;border:1px solid var(--fe-border);border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);padding:1.25rem;margin-bottom:1.25rem}
+.grid{display:grid;gap:1rem}.grid.cols-3{grid-template-columns:repeat(3,1fr)}
+.stat{background:#fff;border:1px solid var(--fe-border);border-radius:var(--radius);padding:1.25rem}
+.stat .num{font-family:'Plus Jakarta Sans';font-size:2.2rem;font-weight:800;color:var(--fe-primary)}
+.stat .lbl{color:var(--fe-muted);font-size:.9rem}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--fe-border);vertical-align:top}
+th{color:var(--fe-muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+tr:hover td{background:#fafbff}
+.badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600}
+.badge.brand{background:#eef2ff;color:var(--fe-primary-2)}
+.badge.muted{background:#f1f5f9;color:var(--fe-muted)}
+
+/* Forms + buttons */
+label{display:block;font-size:.85rem;font-weight:600;margin:.7rem 0 .25rem;color:var(--fe-text)}
+input,select,textarea{width:100%;padding:.55rem .7rem;border:1px solid var(--fe-border);
+  border-radius:var(--radius-btn);font:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--fe-primary-2);
+  box-shadow:0 0 0 3px rgba(45,77,179,.12)}
+.row{display:flex;gap:1rem;flex-wrap:wrap}.row>div{flex:1;min-width:180px}
+.btn{display:inline-block;background:var(--fe-accent);color:#fff;border:none;cursor:pointer;
+  padding:.6rem 1.4rem;border-radius:var(--radius-btn);font-weight:600;font-size:.95rem}
+.btn:hover{filter:brightness(.94);text-decoration:none;color:#fff}
+.btn.secondary{background:#fff;color:var(--fe-primary);border:2px solid var(--fe-primary);padding:.5rem 1.3rem}
+.btn.sm{padding:.35rem .8rem;font-size:.85rem}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem}
+.search{max-width:420px;position:relative}
+.alert{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:.7rem 1rem;border-radius:var(--radius-btn);margin-bottom:1rem}
+
+/* Login */
+.login-wrap{min-height:100vh;display:grid;place-items:center;background:var(--fe-grad)}
+.login-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-md);
+  padding:2rem;width:360px;max-width:92vw}
+.login-card .brand{font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.3rem;
+  color:var(--fe-primary);margin-bottom:.2rem}
+.muted{color:var(--fe-muted)}.small{font-size:.85rem}
+@media(max-width:720px){.sidebar{width:64px}.sidebar .brand span,.sidebar nav a span,.sidebar .tag{display:none}.grid.cols-3{grid-template-columns:1fr}}
+
+/* ---- Requisition builder (search + cart) ---- */
+.rq-head{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem}
+.rq-head .row{flex:1}
+.rq-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem;align-items:start}
+.rq-search input.big{font-size:1rem;padding:.85rem 1rem .85rem 2.4rem;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%236B7A8D' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat .8rem center}
+.chips{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin:.7rem 0}
+.chip{border:1px solid var(--fe-border);background:#fff;border-radius:999px;padding:.2rem .7rem;font-size:.82rem;cursor:pointer;color:var(--fe-text)}
+.chip:hover{border-color:var(--fe-primary-2);color:var(--fe-primary-2)}
+.chip.count{border:none;background:none;color:var(--fe-muted);cursor:default}
+.item-list{max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:.6rem;padding-right:.2rem}
+.item-card{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:1px solid var(--fe-border);border-radius:var(--radius);padding:.85rem 1rem;background:#fff}
+.item-card:hover{box-shadow:var(--shadow-sm)}
+.item-main .nm{font-weight:600}
+.item-main .sub{color:var(--fe-muted);font-size:.82rem;margin-top:.15rem}
+.item-price{text-align:right;font-weight:700;white-space:nowrap}
+.item-price .per{display:block;color:var(--fe-muted);font-size:.72rem;font-weight:400}
+.item-add{white-space:nowrap}
+.badge.code{background:#eef2ff;color:var(--fe-primary-2);font-family:ui-monospace,monospace}
+.pill-added{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;border-radius:var(--radius-btn);padding:.4rem .9rem;font-weight:600;font-size:.85rem}
+/* cart */
+.cart{position:sticky;top:1rem;border:1px solid var(--fe-border);border-radius:var(--radius);background:#fff;box-shadow:var(--shadow-sm);overflow:hidden}
+.cart-h{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid var(--fe-border)}
+.cart-h h3{margin:0}
+.cart-body{max-height:52vh;overflow:auto;padding:.6rem}
+.cart-line{border:1px solid var(--fe-border);border-radius:10px;padding:.7rem;margin:.4rem;position:relative}
+.cart-line .x{position:absolute;top:.5rem;right:.6rem;color:var(--fe-muted);cursor:pointer;border:none;background:none;font-size:1.1rem;line-height:1}
+.cart-line .nm{font-weight:600;padding-right:1.2rem}
+.cart-line .rowline{display:flex;align-items:center;justify-content:space-between;margin-top:.5rem}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--fe-border);border-radius:var(--radius-btn);overflow:hidden}
+.stepper button{border:none;background:#f4f6fb;width:30px;height:32px;font-size:1rem;cursor:pointer;color:var(--fe-primary)}
+.stepper input{width:52px;text-align:center;border:none;border-left:1px solid var(--fe-border);border-right:1px solid var(--fe-border);height:32px;padding:0}
+.cart-foot{padding:1rem 1.1rem;border-top:1px solid var(--fe-border)}
+.cart-total{display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem}
+.cart-total .v{font-family:'Plus Jakarta Sans';font-size:1.5rem;font-weight:800;color:var(--fe-primary)}
+.cart-empty{color:var(--fe-muted);text-align:center;padding:2rem 1rem;font-size:.9rem}
+@media(max-width:900px){.rq-grid{grid-template-columns:1fr}.cart{position:static}}

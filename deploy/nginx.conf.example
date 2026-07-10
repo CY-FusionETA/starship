@@ -1,0 +1,29 @@
+# Starship — example Nginx + PHP-FPM server block.
+# Copy into /etc/nginx/sites-available/, adjust paths/domain/PHP version, then enable.
+# Nginx ignores .htaccess, so the denies + routing are reproduced here.
+
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    root /var/www/starship;      # <- the project folder
+    index index.php;
+
+    client_max_body_size 20M;    # DO image / PDF uploads
+
+    # Block sensitive directories from the web (DB file, secrets, source).
+    location ~ ^/(config|storage|src)/ { deny all; return 404; }
+    location ~ /\.(?!well-known) { deny all; }   # dotfiles (.htaccess, .gitignore, ...)
+
+    # Front controller: real files (incl. api/*.php) served directly, else -> index.php
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;   # <- match your PHP-FPM version
+    }
+}
+
+# For HTTPS, run: certbot --nginx -d your-domain.com   (adds the 443 block + redirect)

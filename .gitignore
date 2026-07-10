@@ -1,0 +1,19 @@
+# Secrets — never commit
+config/config.php
+
+# SQLite database + WAL sidecars
+storage/*.sqlite
+storage/*.sqlite-shm
+storage/*.sqlite-wal
+
+# Runtime data
+storage/do/*
+storage/tmp/*
+storage/logs/*
+!storage/do/.gitkeep
+!storage/tmp/.gitkeep
+!storage/logs/.gitkeep
+!storage/.htaccess
+
+*.log
+.DS_Store
