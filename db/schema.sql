@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   total_amount   NUMERIC,
   status         TEXT NOT NULL DEFAULT 'draft',
   xero_po_id     TEXT,
+  xero_last_error TEXT,
+  xero_synced_at TEXT,
   created_by     INTEGER,
   created_at     TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at     TEXT DEFAULT CURRENT_TIMESTAMP
@@ -284,6 +286,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+
+-- 12b. app_settings — key/value store for runtime config editable in the UI
+-- (e.g. Xero client_id/secret/enabled). Overrides config.php via App\Settings.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 
 -- 13. gemini_ocr_runs
 CREATE TABLE IF NOT EXISTS gemini_ocr_runs (
