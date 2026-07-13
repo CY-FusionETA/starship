@@ -37,6 +37,10 @@ $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
       <?php $nav('/suppliers', 'Suppliers', '◫'); ?>
       <?php $nav('/projects', 'Projects', '◈'); ?>
       <?php $nav('/aliases', 'Supplier aliases', '⇄'); ?>
+      <?php if ($isAdmin): ?>
+        <div class="tag">System</div>
+        <?php $nav('/settings', 'Settings', '⚙'); ?>
+      <?php endif; ?>
     </nav>
   </aside>
   <div class="main">

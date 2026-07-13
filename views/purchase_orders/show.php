@@ -1,6 +1,11 @@
 <?php /** @var array $po @var array $lines */
+use App\Auth;
+use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
-$sb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'=>'warn','fully_received'=>'ok','over_received'=>'warn','closed'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>'; ?>
+$sb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'=>'warn','fully_received'=>'ok','over_received'=>'warn','closed'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>';
+$xflash = $_GET['xero'] ?? null;
+$flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connected — nothing was sent. Connect it in Settings.', 'err'=>'Xero push failed — see the error below.'][$xflash] ?? null; ?>
+<?php if ($flashMsg): ?><div class="<?= $xflash==='ok'?'notice':'alert' ?>"><?= e($flashMsg) ?></div><?php endif; ?>
 <div class="toolbar">
   <div>
     <h1 style="margin:0">PO <?= e($po['po_number']) ?></h1>

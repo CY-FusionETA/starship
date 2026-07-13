@@ -1,0 +1,92 @@
+<?php /** @var ?array $token @var bool $connected @var bool $configured @var bool $enabled
+ * @var string $client_id @var bool $has_secret @var string $redirect_uri @var string $scopes
+ * @var ?string $notice @var ?string $error */
+use App\Csrf;
+$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
+
+<div class="toolbar"><h1 style="margin:0">Settings</h1></div>
+
+<?php if ($notice): ?><div class="notice"><?= e($notice) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
+
+<div class="card xero-card">
+  <div class="xero-head">
+    <div class="xero-title">
+      <span class="xero-logo">X</span>
+      <div>
+        <h2 style="margin:0">Xero integration</h2>
+        <span class="muted small">Auto-create a Purchase Order in Xero whenever one is raised in Starship.</span>
+      </div>
+    </div>
+    <?php if ($connected): ?>
+      <span class="conn-pill on">● Connected<?= !empty($token['tenant_name']) ? ' · ' . e($token['tenant_name']) : '' ?></span>
+    <?php else: ?>
+      <span class="conn-pill off">● Not connected</span>
+    <?php endif; ?>
+  </div>
+
+  <?php if ($connected): ?>
+    <div class="xero-connected">
+      <div>
+        <div class="muted small">Organisation</div>
+        <strong><?= e($token['tenant_name'] ?: 'Xero organisation') ?></strong>
+        <?php if (!empty($token['expires_at'])): ?><div class="muted small">Token auto-refreshes · last updated <?= e($token['updated_at'] ?? '') ?></div><?php endif; ?>
+      </div>
+      <div class="xero-conn-actions">
+        <a class="btn secondary" href="<?= e($base) ?>/settings/xero/connect">Reconnect</a>
+        <form method="post" action="<?= e($base) ?>/settings/xero/disconnect" onsubmit="return confirm('Disconnect Starship from Xero? New POs will stop syncing until reconnected.')">
+          <?= Csrf::field() ?><button class="btn ghost-danger">Disconnect</button>
+        </form>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <form method="post" action="<?= e($base) ?>/settings/save" class="xero-form">
+    <?= Csrf::field() ?>
+    <label class="switch-row">
+      <input type="checkbox" name="enabled" value="1" <?= $enabled ? 'checked' : '' ?>>
+      <span>Enable Xero auto-sync</span>
+    </label>
+
+    <div class="row">
+      <div><label>Client ID</label><input name="client_id" value="<?= e($client_id) ?>" placeholder="from your Xero app" autocomplete="off"></div>
+      <div><label>Client Secret</label><input name="client_secret" type="password" placeholder="<?= $has_secret ? '•••••• (leave blank to keep)' : 'from your Xero app' ?>" autocomplete="off"></div>
+    </div>
+
+    <label>Redirect URI <span class="muted small">— add this exact URL to your Xero app’s “Redirect URIs”</span></label>
+    <div class="copy-field">
+      <input name="redirect_uri" id="redir" value="<?= e($redirect_uri) ?>">
+      <button type="button" class="btn sm secondary" onclick="copyRedir()">Copy</button>
+    </div>
+
+    <label>Scopes</label>
+    <input name="scopes" value="<?= e($scopes) ?>">
+
+    <div class="xero-actions">
+      <button class="btn secondary">Save</button>
+      <?php if ($configured): ?>
+        <a class="btn" href="<?= e($base) ?>/settings/xero/connect"><?= $connected ? 'Reconnect to Xero' : 'Connect to Xero →' ?></a>
+      <?php else: ?>
+        <span class="muted small">Enter Client ID + Secret and Save, then Connect.</span>
+      <?php endif; ?>
+    </div>
+  </form>
+
+  <details class="xero-help">
+    <summary>How to get your Xero credentials</summary>
+    <ol class="muted small">
+      <li>Go to <strong>developer.xero.com → My Apps → New app</strong> (Web app).</li>
+      <li>Set the <strong>Redirect URI</strong> to the exact URL shown above.</li>
+      <li>Copy the <strong>Client ID</strong> and generate a <strong>Client Secret</strong>; paste both here and Save.</li>
+      <li>Click <strong>Connect to Xero</strong> and choose the organisation to link.</li>
+    </ol>
+  </details>
+</div>
+
+<script>
+function copyRedir(){
+  const el = document.getElementById('redir'); el.select(); el.setSelectionRange(0,99999);
+  navigator.clipboard?.writeText(el.value); const b=event.target; const t=b.textContent; b.textContent='Copied ✓';
+  setTimeout(()=>b.textContent=t,1200);
+}
+</script>

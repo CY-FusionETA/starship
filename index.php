@@ -7,6 +7,8 @@ use App\Auth;
 use App\Csrf;
 use App\Response;
 use App\Router;
+use App\Settings;
+use App\Service\Xero\XeroOAuth;
 use App\Repo\CatalogueRepo;
 use App\Repo\SupplierRepo;
 use App\Repo\ProjectRepo;
@@ -268,6 +270,14 @@ $r->get('/purchase-orders/{id}', function ($p) {
     if (!$po) Response::notFound();
     Response::view('purchase_orders/show', ['po' => $po, 'lines' => PurchaseOrderRepo::lines((int)$p['id'])], 'PO ' . $po['po_number']);
 });
+// Manual Xero push / retry (superadmin) — for POs raised while Xero was down or disconnected.
+$r->post('/purchase-orders/{id}/xero-sync', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $res = PurchaseOrderRepo::syncToXero((int)$p['id']);
+    $q = !empty($res['xero_po_id']) ? 'ok' : (!empty($res['stubbed']) ? 'stub' : 'err');
+    Response::redirect('/purchase-orders/' . (int)$p['id'] . '?xero=' . $q);
+});
 
 // --- Delivery Orders (capture + 3-way match) ------------------------
 $r->get('/delivery-orders', function () {
@@ -380,6 +390,63 @@ $r->post('/delivery-orders/{id}/confirm', function ($p) {
     Csrf::check();
     MatchingService::commit((int)$p['id'], $_POST['line'] ?? []);
     Response::redirect('/delivery-orders/' . (int)$p['id']);
+});
+
+// --- Settings (superadmin: Xero connection & config) ----------------
+$r->get('/settings', function () {
+    Auth::requireRole('admin');
+    Response::view('settings/index', [
+        'token'   => XeroOAuth::token(),
+        'connected' => XeroOAuth::isConnected(),
+        'configured' => XeroOAuth::isConfigured(),
+        'enabled' => Settings::bool('xero.enabled'),
+        'client_id' => XeroOAuth::clientId(),
+        'has_secret' => XeroOAuth::clientSecret() !== '',
+        'redirect_uri' => XeroOAuth::redirectUri(),
+        'scopes'  => XeroOAuth::scopes(),
+        'notice'  => $_GET['ok'] ?? null,
+        'error'   => $_GET['err'] ?? null,
+    ], 'Settings');
+});
+$r->post('/settings/save', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    Settings::set('xero.client_id', trim($_POST['client_id'] ?? ''));
+    // Only overwrite the secret when a new one is typed (blank leaves it as-is).
+    if (trim($_POST['client_secret'] ?? '') !== '') Settings::set('xero.client_secret', trim($_POST['client_secret']));
+    Settings::set('xero.redirect_uri', trim($_POST['redirect_uri'] ?? ''));
+    Settings::set('xero.scopes', trim($_POST['scopes'] ?? '') ?: XeroOAuth::DEFAULT_SCOPES);
+    Settings::set('xero.enabled', isset($_POST['enabled']) ? '1' : '0');
+    Response::redirect('/settings?ok=saved');
+});
+$r->get('/settings/xero/connect', function () {
+    Auth::requireRole('admin');
+    if (!XeroOAuth::isConfigured()) Response::redirect('/settings?err=' . rawurlencode('Enter your Xero Client ID and Secret first, then Save.'));
+    $state = bin2hex(random_bytes(16));
+    $_SESSION['xero_oauth_state'] = $state;
+    Response::redirect(XeroOAuth::authorizeUrl($state));
+});
+$r->get('/settings/xero/callback', function () {
+    Auth::requireRole('admin');
+    if (!empty($_GET['error'])) Response::redirect('/settings?err=' . rawurlencode('Xero: ' . $_GET['error']));
+    $state = $_GET['state'] ?? '';
+    if (!$state || !hash_equals($_SESSION['xero_oauth_state'] ?? '', (string)$state)) {
+        Response::redirect('/settings?err=' . rawurlencode('Security check failed (state mismatch). Please try connecting again.'));
+    }
+    unset($_SESSION['xero_oauth_state']);
+    try {
+        $info = XeroOAuth::completeConnection((string)($_GET['code'] ?? ''));
+        Settings::set('xero.enabled', '1'); // connecting implies enabling
+        Response::redirect('/settings?ok=' . rawurlencode('Connected to ' . ($info['tenant_name'] ?: 'Xero')));
+    } catch (\Throwable $e) {
+        Response::redirect('/settings?err=' . rawurlencode($e->getMessage()));
+    }
+});
+$r->post('/settings/xero/disconnect', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    XeroOAuth::disconnect();
+    Response::redirect('/settings?ok=' . rawurlencode('Disconnected from Xero.'));
 });
 
 $r->dispatch();

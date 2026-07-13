@@ -161,12 +161,34 @@ final class PurchaseOrderRepo
             return $poId;
         });
 
-        // Xero seam (stubbed until Phase 6): logs intent, returns null id.
+        // Auto-push to Xero. Never blocks PO creation — records status/error.
+        self::syncToXero($poId);
+        return $poId;
+    }
+
+    /**
+     * Create the matching Purchase Order in Xero. Idempotent-ish: if the PO is
+     * already synced it returns early. Records xero_po_id + xero_synced_at on
+     * success, xero_last_error on failure. Falls back to the stub (no-op) when
+     * Xero isn't enabled/connected. Returns the client result array.
+     */
+    public static function syncToXero(int $poId): array
+    {
         $po = self::find($poId);
+        if (!$po) return ['xero_po_id' => null, 'stubbed' => true];
+        if (!empty($po['xero_po_id'])) {
+            return ['xero_po_id' => $po['xero_po_id'], 'stubbed' => false, 'already' => true];
+        }
         $res = XeroClientFactory::make()->createPurchaseOrder($po, self::lines($poId));
         if (!empty($res['xero_po_id'])) {
-            Db::update('purchase_orders', $poId, ['xero_po_id' => $res['xero_po_id']]);
+            Db::update('purchase_orders', $poId, [
+                'xero_po_id'      => $res['xero_po_id'],
+                'xero_synced_at'  => date('Y-m-d H:i:s'),
+                'xero_last_error' => null,
+            ]);
+        } elseif (empty($res['stubbed']) && !empty($res['error'])) {
+            Db::update('purchase_orders', $poId, ['xero_last_error' => $res['error']]);
         }
-        return $poId;
+        return $res;
     }
 }
