@@ -20,14 +20,20 @@ final class XeroOAuth
     public const DEFAULT_SCOPES =
         'openid profile email accounting.transactions accounting.contacts accounting.settings offline_access';
 
-    public static function clientId(): string     { return trim((string)Settings::get('xero.client_id', '')); }
-    public static function clientSecret(): string { return trim((string)Settings::get('xero.client_secret', '')); }
-    public static function scopes(): string        { return trim((string)Settings::get('xero.scopes', self::DEFAULT_SCOPES)); }
+    // Connection params come from the DB (Settings tab), NOT config.php — the
+    // config 'xero' block is placeholder scaffold, so we read raw() with code defaults.
+    public static function clientId(): string     { return trim((string)Settings::raw('xero.client_id', '')); }
+    public static function clientSecret(): string { return trim((string)Settings::raw('xero.client_secret', '')); }
+    public static function scopes(): string
+    {
+        $s = trim((string)Settings::raw('xero.scopes', ''));
+        return $s !== '' ? $s : self::DEFAULT_SCOPES;
+    }
 
     /** The redirect URI Xero calls back. Must be registered verbatim in the Xero app. */
     public static function redirectUri(): string
     {
-        $cfg = trim((string)Settings::get('xero.redirect_uri', ''));
+        $cfg = trim((string)Settings::raw('xero.redirect_uri', ''));
         if ($cfg !== '') return $cfg;
         $base = rtrim((string)cfg('app.base_url', ''), '/');
         return $base . '/settings/xero/callback';

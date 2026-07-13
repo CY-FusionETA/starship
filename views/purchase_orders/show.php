@@ -14,9 +14,28 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
   </div>
   <div>
     <span class="badge <?= ['issued'=>'brand','partially_received'=>'warn','fully_received'=>'ok'][$po['status']] ?? 'muted' ?>"><?= e(str_replace('_',' ',$po['status'])) ?></span>
-    <?= $po['xero_po_id'] ? '<span class="badge ok">Xero synced</span>' : '<span class="badge muted">Xero: stub</span>' ?>
+    <?php if (!empty($po['xero_po_id'])): ?>
+      <span class="badge ok" title="Xero PO <?= e($po['xero_po_id']) ?>">✓ Xero synced</span>
+    <?php elseif (!empty($po['xero_last_error'])): ?>
+      <span class="badge danger">Xero: failed</span>
+      <?php if (Auth::isAdmin()): ?>
+        <form method="post" action="<?= e($base) ?>/purchase-orders/<?= (int)$po['id'] ?>/xero-sync" style="display:inline">
+          <?= Csrf::field() ?><button class="btn sm">Retry Xero</button>
+        </form>
+      <?php endif; ?>
+    <?php else: ?>
+      <span class="badge muted">Xero: not synced</span>
+      <?php if (Auth::isAdmin()): ?>
+        <form method="post" action="<?= e($base) ?>/purchase-orders/<?= (int)$po['id'] ?>/xero-sync" style="display:inline">
+          <?= Csrf::field() ?><button class="btn sm">Sync to Xero</button>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
   </div>
 </div>
+<?php if (!empty($po['xero_last_error']) && empty($po['xero_po_id'])): ?>
+  <div class="alert" style="margin-top:.4rem"><strong>Xero error:</strong> <?= e($po['xero_last_error']) ?></div>
+<?php endif; ?>
 <div class="card">
   <table>
     <thead><tr><th>#</th><th>Description</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Unit price</th><th>Line total</th><th>Status</th></tr></thead>

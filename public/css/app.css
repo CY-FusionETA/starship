@@ -258,6 +258,32 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .modal-f{display:flex;justify-content:flex-end;gap:.6rem;padding:1rem 1.3rem;border-top:1px solid var(--fe-border);
   position:sticky;bottom:0;background:#fff}
 
+/* Settings — Xero card */
+.xero-card{max-width:760px}
+.xero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;
+  padding-bottom:1rem;border-bottom:1px solid var(--fe-border);margin-bottom:1rem}
+.xero-title{display:flex;gap:.8rem;align-items:center}
+.xero-logo{width:42px;height:42px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;
+  background:linear-gradient(135deg,#13B5EA,#0d8fbf);color:#fff;font-weight:900;font-size:1.3rem;
+  font-family:'Plus Jakarta Sans';box-shadow:0 3px 10px rgba(19,181,234,.35)}
+.conn-pill{font-size:.8rem;font-weight:700;padding:.3rem .7rem;border-radius:999px;white-space:nowrap}
+.conn-pill.on{background:#dcfce7;color:#15803d}
+.conn-pill.off{background:#f1f5f9;color:var(--fe-muted)}
+.xero-connected{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;
+  background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1.1rem}
+.xero-conn-actions{display:flex;gap:.5rem;align-items:center}
+.xero-conn-actions form{display:inline}
+.xero-form label{margin-top:1rem}
+.switch-row{display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .4rem}
+.switch-row input{width:auto;margin:0}
+.switch-row span{font-weight:600}
+.copy-field{display:flex;gap:.5rem;align-items:center}
+.copy-field input{font-family:ui-monospace,monospace;font-size:.85rem;background:#f8fafc}
+.xero-actions{display:flex;gap:.7rem;align-items:center;margin-top:1.3rem;flex-wrap:wrap}
+.xero-help{margin-top:1.2rem;border-top:1px solid var(--fe-border);padding-top:.9rem}
+.xero-help summary{cursor:pointer;font-weight:600;color:var(--fe-primary-2)}
+.xero-help ol{margin:.6rem 0 0;padding-left:1.2rem;line-height:1.9}
+
 /* Responsive */
 @media(max-width:1050px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:900px){.rq-grid{grid-template-columns:1fr}.cart{position:static}}
