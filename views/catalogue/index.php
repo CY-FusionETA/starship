@@ -1,5 +1,11 @@
 <?php /** @var array $items  @var string $q */
-$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
+use App\Auth;
+use App\Csrf;
+$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
+$isAdmin = Auth::isAdmin();
+$msg = $_GET['msg'] ?? '';
+$msgText = ['deleted' => 'Product permanently deleted.', 'archived' => 'Product was in use, so it was archived (hidden) to keep history intact.'][$msg] ?? ''; ?>
+<?php if ($msgText): ?><div class="notice"><?= e($msgText) ?></div><?php endif; ?>
 <div class="toolbar">
   <form class="search" method="get" action="<?= e($base) ?>/catalogue">
     <input name="q" value="<?= e($q) ?>" placeholder="Search by brand, model, code, name or description…" autofocus>
@@ -20,10 +26,18 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
         <td><?= e(($it['category'] ?? '') ?: '—') ?></td>
         <td><?= e($it['uom'] ?: '—') ?></td>
         <td><?= isset($it['unit_price']) && $it['unit_price'] !== null ? 'RM ' . number_format((float)$it['unit_price'], 2) : '<span class="muted">—</span>' ?></td>
-        <td><a class="btn sm secondary" href="<?= e($base) ?>/catalogue/<?= (int)$it['id'] ?>/edit">Edit</a></td>
+        <td class="row-actions">
+          <a class="btn sm secondary" href="<?= e($base) ?>/catalogue/<?= (int)$it['id'] ?>/edit">Edit</a>
+          <?php if ($isAdmin): ?>
+          <form method="post" action="<?= e($base) ?>/catalogue/<?= (int)$it['id'] ?>/delete"
+                onsubmit="return confirm('Delete this product? If it has been used on a requisition or PO it will be archived instead of removed.')" style="display:inline">
+            <?= Csrf::field() ?><button class="btn sm ghost-danger">Delete</button>
+          </form>
+          <?php endif; ?>
+        </td>
       </tr>
     <?php endforeach; endif; ?>
     </tbody>
   </table>
 </div>
-<p class="muted small"><?= count($items) ?> item(s) shown.</p>
+<p class="muted small"><?= count($items) ?> item(s) shown.<?= $isAdmin ? '' : ' Only a superadmin can delete products.' ?></p>

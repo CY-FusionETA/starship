@@ -34,7 +34,13 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
         <span class="chip count" id="count"></span>
       </div>
       <div class="item-list" id="items"></div>
-      <p style="margin-top:.8rem"><button type="button" class="btn sm secondary" onclick="addCustom()">＋ Add custom (non-catalogue) item</button></p>
+      <div class="add-row">
+        <button type="button" class="btn sm" onclick="openNewProduct()">＋ New product</button>
+        <button type="button" class="btn sm secondary" onclick="addCustom()">＋ One-off (non-catalogue) item</button>
+      </div>
+      <p class="muted small" style="margin:.5rem 0 0">
+        <strong>New product</strong> saves to the catalogue for everyone. <strong>One-off</strong> adds a free-text line to this requisition only.
+      </p>
     </div>
 
     <!-- right: cart -->
@@ -50,8 +56,41 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
   </div>
 </form>
 
+<!-- New catalogue product modal (outside #mrForm so its fields never submit with the MR) -->
+<div class="modal-overlay" id="npOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="npTitle">
+    <div class="modal-h">
+      <h3 id="npTitle">New catalogue product</h3>
+      <button type="button" class="modal-x" onclick="closeNewProduct()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-b">
+      <p class="muted small" style="margin-top:0">Saved to the catalogue and added straight to this requisition.</p>
+      <div id="npErr" class="alert" hidden></div>
+      <label>Product name *</label>
+      <input id="np_name" placeholder="e.g. 6&quot; Victaulic Firelock Coupling" autocomplete="off">
+      <div class="row">
+        <div><label>Item code</label><input id="np_code" placeholder="auto if blank"></div>
+        <div><label>UOM</label><input id="np_uom" placeholder="nos / ft / m" value="nos"></div>
+      </div>
+      <div class="row">
+        <div><label>Brand</label><input id="np_brand" placeholder="Notifier / Victaulic …"></div>
+        <div><label>Model</label><input id="np_model"></div>
+      </div>
+      <div class="row">
+        <div><label>Category</label><input id="np_category" placeholder="Fire Alarm / Piping …"></div>
+        <div><label>Ref. unit price (MYR)</label><input id="np_price" type="number" step="any" min="0" placeholder="optional"></div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button type="button" class="btn secondary" onclick="closeNewProduct()">Cancel</button>
+      <button type="button" class="btn" id="npSave" onclick="saveNewProduct()">Save &amp; add →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const BASE = <?= json_encode($base) ?>;
+const CSRF = <?= json_encode(Csrf::token()) ?>;
 const cart = new Map();      // id -> {id, code, name, uom, price, qty, custom}
 let items = [], customSeq = 0;
 
@@ -86,6 +125,45 @@ function addCustom(){
   const key='x'+(customSeq++);
   cart.set(key,{id:null,code:'custom',name:name,uom:'nos',price:null,qty:1,custom:true});
   renderCart();
+}
+
+// ---- New catalogue product (inline create) ----
+const npOverlay = document.getElementById('npOverlay');
+function openNewProduct(){
+  document.getElementById('npErr').hidden = true;
+  ['name','code','brand','model','category','price'].forEach(f=>document.getElementById('np_'+f).value='');
+  document.getElementById('np_uom').value='nos';
+  npOverlay.hidden = false;
+  setTimeout(()=>document.getElementById('np_name').focus(),30);
+}
+function closeNewProduct(){ npOverlay.hidden = true; }
+npOverlay.addEventListener('click',e=>{ if(e.target===npOverlay) closeNewProduct(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !npOverlay.hidden) closeNewProduct(); });
+async function saveNewProduct(){
+  const name = document.getElementById('np_name').value.trim();
+  const err = document.getElementById('npErr');
+  if(!name){ err.textContent='Product name is required.'; err.hidden=false; document.getElementById('np_name').focus(); return; }
+  const btn = document.getElementById('npSave'); btn.disabled=true; btn.textContent='Saving…';
+  const body = new URLSearchParams({
+    _csrf: CSRF, name,
+    item_code: document.getElementById('np_code').value.trim(),
+    uom: document.getElementById('np_uom').value.trim(),
+    brand: document.getElementById('np_brand').value.trim(),
+    model: document.getElementById('np_model').value.trim(),
+    category: document.getElementById('np_category').value.trim(),
+    unit_price: document.getElementById('np_price').value.trim(),
+  });
+  try{
+    const r = await fetch(`${BASE}/catalogue/quick-add.json`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},body});
+    const d = await r.json();
+    if(!r.ok || d.error){ err.textContent = d.error || 'Could not save product.'; err.hidden=false; return; }
+    // Drop it into the list + cart, and echo the search box so it stays visible.
+    if(!items.some(it=>it.id===d.item.id)) items.unshift(d.item);
+    renderItems();
+    addItem(d.item);
+    closeNewProduct();
+  }catch(ex){ err.textContent='Network error — please try again.'; err.hidden=false; }
+  finally{ btn.disabled=false; btn.textContent='Save & add →'; }
 }
 function setQty(key,q){ const l=cart.get(key); if(!l) return; l.qty=Math.max(1,parseFloat(q)||1); renderCart(); }
 function bump(key,d){ const l=cart.get(key); if(!l) return; l.qty=Math.max(1,(parseFloat(l.qty)||1)+d); renderCart(); }

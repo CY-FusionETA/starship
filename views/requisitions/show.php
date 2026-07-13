@@ -1,4 +1,5 @@
 <?php /** @var array $req @var array $lines @var array $suppliers @var ?string $error */
+use App\Auth;
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $hasRemaining = false;
@@ -18,9 +19,16 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
   <div>
     <span class="badge <?= ['draft'=>'muted','approved'=>'brand','partially_ordered'=>'warn','fully_ordered'=>'ok'][$req['status']] ?? 'muted' ?>" style="font-size:.8rem"><?= e(str_replace('_',' ',$req['status'])) ?></span>
     <?php if ($req['status'] === 'draft'): ?>
-      <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/approve" style="display:inline">
-        <?= Csrf::field() ?><button class="btn sm">Approve</button>
-      </form>
+      <?php if (Auth::isAdmin()): ?>
+        <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/reject" onsubmit="return confirm('Reject this requisition?')" style="display:inline">
+          <?= Csrf::field() ?><button class="btn sm ghost-danger">Reject</button>
+        </form>
+        <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/approve" style="display:inline">
+          <?= Csrf::field() ?><button class="btn sm">Approve ✓</button>
+        </form>
+      <?php else: ?>
+        <span class="badge warn" style="font-size:.8rem">⏳ Awaiting superadmin approval</span>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>

@@ -34,6 +34,11 @@ final class PurchaseOrderRepo
         );
     }
 
+    public static function count(): int
+    {
+        return (int)Db::scalar("SELECT COUNT(*) FROM purchase_orders");
+    }
+
     public static function lines(int $poId): array
     {
         return Db::all(

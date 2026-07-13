@@ -32,6 +32,24 @@ final class Auth
 
     public static function check(): bool { return !empty($_SESSION['uid']); }
 
+    /** Current user's role, or '' if signed out. */
+    public static function role(): string { return (string)($_SESSION['role'] ?? ''); }
+
+    /** Superadmin (Simon) — may approve requisitions and delete catalogue items. */
+    public static function isAdmin(): bool { return self::role() === 'admin'; }
+
+    /** True when the current role is admin OR one of the given roles. */
+    public static function is(string ...$roles): bool
+    {
+        return self::isAdmin() || in_array(self::role(), $roles, true);
+    }
+
+    /** Human label for the current role (used in the top bar). */
+    public static function roleLabel(): string
+    {
+        return self::isAdmin() ? 'Superadmin' : (self::role() === 'staff' ? 'Staff' : ucfirst(self::role() ?: 'Guest'));
+    }
+
     public static function user(): ?array
     {
         if (!self::check()) return null;

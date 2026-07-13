@@ -76,6 +76,56 @@ final class CatalogueRepo
 
     public static function count(): int
     {
-        return (int)Db::scalar("SELECT COUNT(*) FROM catalogue_items");
+        return (int)Db::scalar("SELECT COUNT(*) FROM catalogue_items WHERE is_active = 1");
+    }
+
+    public static function codeExists(string $code): bool
+    {
+        return (bool)Db::scalar("SELECT 1 FROM catalogue_items WHERE item_code = ?", [trim($code)]);
+    }
+
+    /**
+     * Derive a unique-ish item code from a name when the user didn't type one.
+     * e.g. "6\" Victaulic Coupling" -> "VICTAULIC-COUPLING" (or -2, -3 … on clash).
+     */
+    public static function suggestCode(string $name): string
+    {
+        $slug = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '-', trim($name)));
+        $slug = trim($slug, '-');
+        $words = array_slice(array_filter(explode('-', $slug)), 0, 3);
+        $base = $words ? implode('-', $words) : 'ITEM';
+        $base = substr($base, 0, 24);
+        $code = $base;
+        $n = 1;
+        while (self::codeExists($code)) { $n++; $code = $base . '-' . $n; }
+        return $code;
+    }
+
+    /** True if the item is referenced by any requisition / PO / DO line. */
+    public static function isReferenced(int $id): bool
+    {
+        return (bool)Db::scalar(
+            "SELECT 1 FROM requisition_lines WHERE catalogue_item_id = ?
+             UNION SELECT 1 FROM po_lines WHERE catalogue_item_id = ?
+             UNION SELECT 1 FROM do_lines WHERE matched_catalogue_item_id = ? LIMIT 1",
+            [$id, $id, $id]
+        );
+    }
+
+    /**
+     * Smart delete (superadmin): permanently remove an unused item, otherwise
+     * archive it (is_active = 0) so historical requisitions/POs keep resolving.
+     * Returns 'deleted' or 'archived'.
+     */
+    public static function delete(int $id): string
+    {
+        if (self::isReferenced($id)) {
+            Db::update('catalogue_items', $id, ['is_active' => 0]);
+            AuditRepo::log('catalogue_item', $id, 'archive');
+            return 'archived';
+        }
+        Db::q("DELETE FROM catalogue_items WHERE id = ?", [$id]);
+        AuditRepo::log('catalogue_item', $id, 'delete');
+        return 'deleted';
     }
 }

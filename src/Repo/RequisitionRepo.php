@@ -27,6 +27,44 @@ final class RequisitionRepo
         );
     }
 
+    public static function count(): int
+    {
+        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions");
+    }
+
+    /** Number of requisitions awaiting superadmin approval. */
+    public static function pendingCount(): int
+    {
+        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'");
+    }
+
+    /** Draft requisitions awaiting approval, newest first, with line count + creator. */
+    public static function pending(int $limit = 100): array
+    {
+        return Db::all(
+            "SELECT r.*, p.name AS project_name, p.project_code, u.name AS created_by_name,
+                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count
+             FROM requisitions r
+             JOIN projects p ON p.id = r.project_id
+             LEFT JOIN users u ON u.id = r.created_by
+             WHERE r.status = 'draft'
+             ORDER BY r.created_at DESC LIMIT ?",
+            [$limit]
+        );
+    }
+
+    /** Most recent requisitions of any status (for the dashboard feed). */
+    public static function recent(int $limit = 6): array
+    {
+        return Db::all(
+            "SELECT r.*, p.name AS project_name, p.project_code,
+                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count
+             FROM requisitions r JOIN projects p ON p.id = r.project_id
+             ORDER BY r.created_at DESC LIMIT ?",
+            [$limit]
+        );
+    }
+
     /** Lines with catalogue name + PO references (a line can span multiple POs). */
     public static function lines(int $reqId): array
     {
@@ -87,6 +125,12 @@ final class RequisitionRepo
     {
         Db::q("UPDATE requisitions SET status = 'approved' WHERE id = ? AND status = 'draft'", [$id]);
         AuditRepo::log('requisition', $id, 'approve');
+    }
+
+    public static function reject(int $id): void
+    {
+        Db::q("UPDATE requisitions SET status = 'cancelled' WHERE id = ? AND status = 'draft'", [$id]);
+        AuditRepo::log('requisition', $id, 'reject');
     }
 
     /** Recompute MR + line statuses from qty_ordered. Call after PO creation. */

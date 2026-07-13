@@ -114,7 +114,9 @@ if ($coupling && !Db::one("SELECT id FROM item_supplier_aliases WHERE supplier_i
     echo "Alias: Seng Choon '6.5\"OD Victaulic Firelock Coupling' -> VIC-COUP-6\n";
 }
 
-// --- Admin user -----------------------------------------------------
+// --- Users ----------------------------------------------------------
+// Two permission levels: 'admin' = superadmin (approve requisitions, delete
+// catalogue) and 'staff' = everyone else (create requisitions/products, no approve/delete).
 $adminEmail = 'simon@fusioneta.com';
 if (!Db::one("SELECT id FROM users WHERE email = ?", [$adminEmail])) {
     $pw = bin2hex(random_bytes(5)); // 10-char temp password, shown once
@@ -125,5 +127,17 @@ if (!Db::one("SELECT id FROM users WHERE email = ?", [$adminEmail])) {
     echo "\n*** ADMIN CREATED ***\n  email: {$adminEmail}\n  temporary password: {$pw}\n  (change it after first login)\n";
 } else {
     echo "Admin {$adminEmail} already exists.\n";
+}
+
+$staffEmail = 'staff@fusioneta.com';
+if (!Db::one("SELECT id FROM users WHERE email = ?", [$staffEmail])) {
+    $pw = bin2hex(random_bytes(5));
+    Db::insert('users', [
+        'name' => 'Staff', 'email' => $staffEmail,
+        'password_hash' => password_hash($pw, PASSWORD_BCRYPT), 'role' => 'staff',
+    ]);
+    echo "\n*** STAFF CREATED ***\n  email: {$staffEmail}\n  temporary password: {$pw}\n  (change it after first login)\n";
+} else {
+    echo "Staff {$staffEmail} already exists.\n";
 }
 echo "Seed complete.\n";

@@ -51,11 +51,22 @@ $r->get('/', function () {
     Auth::require();
     Response::view('dashboard', [
         'stats' => [
-            'catalogue' => CatalogueRepo::count(),
-            'suppliers' => count(SupplierRepo::all()),
-            'projects'  => count(ProjectRepo::all()),
+            'catalogue'    => CatalogueRepo::count(),
+            'suppliers'    => count(SupplierRepo::all()),
+            'projects'     => count(ProjectRepo::all()),
+            'requisitions' => RequisitionRepo::count(),
+            'pending'      => RequisitionRepo::pendingCount(),
+            'pos'          => PurchaseOrderRepo::count(),
         ],
+        'pendingReqs' => Auth::isAdmin() ? RequisitionRepo::pending(5) : [],
+        'recentReqs'  => RequisitionRepo::recent(6),
     ], 'Dashboard');
+});
+
+// --- Approvals (superadmin inbox: incoming requisition requests) -----
+$r->get('/approvals', function () {
+    Auth::requireRole('admin');
+    Response::view('approvals/index', ['pending' => RequisitionRepo::pending(100)], 'Approvals');
 });
 
 // --- Catalogue ------------------------------------------------------
@@ -79,21 +90,55 @@ $r->get('/catalogue/search.json', function () {
     ], $items)]);
 });
 $r->get('/catalogue/new', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Response::view('catalogue/form', ['item' => null], 'New item');
 });
 $r->get('/catalogue/{id}/edit', function ($p) {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     $item = CatalogueRepo::find((int)$p['id']);
     if (!$item) Response::notFound();
     Response::view('catalogue/form', ['item' => $item], 'Edit item');
 });
 $r->post('/catalogue/save', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     CatalogueRepo::save($_POST, $id);
     Response::redirect('/catalogue');
+});
+// Inline quick-add from the requisition builder — creates a catalogue item and
+// returns it as JSON so it can be dropped straight into the cart. Staff & up.
+$r->post('/catalogue/quick-add.json', function () {
+    Auth::requireRole('staff', 'purchaser', 'admin');
+    Csrf::check();
+    $name = trim($_POST['name'] ?? '');
+    if ($name === '') Response::json(['error' => 'Product name is required.'], 422);
+    $code = trim($_POST['item_code'] ?? '');
+    if ($code === '') $code = CatalogueRepo::suggestCode($name);
+    if (CatalogueRepo::codeExists($code)) Response::json(['error' => 'Item code "' . $code . '" already exists.'], 422);
+    try {
+        $id = CatalogueRepo::save(['item_code' => $code] + $_POST, null);
+    } catch (\Throwable $ex) {
+        Response::json(['error' => 'Could not save: ' . $ex->getMessage()], 422);
+    }
+    $c = CatalogueRepo::find($id);
+    Response::json(['item' => [
+        'id'         => (int)$c['id'],
+        'item_code'  => $c['item_code'],
+        'name'       => $c['name'],
+        'brand'      => $c['brand'],
+        'model'      => $c['model'],
+        'category'   => $c['category'] ?? null,
+        'uom'        => $c['uom'] ?: 'ea',
+        'unit_price' => $c['unit_price'] !== null ? (float)$c['unit_price'] : null,
+    ]]);
+});
+// Delete a catalogue item — superadmin only. Permanent if never used, else archived.
+$r->post('/catalogue/{id}/delete', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $outcome = CatalogueRepo::delete((int)$p['id']);
+    Response::redirect('/catalogue?msg=' . $outcome);
 });
 
 // --- Suppliers ------------------------------------------------------
@@ -102,17 +147,17 @@ $r->get('/suppliers', function () {
     Response::view('suppliers/index', ['suppliers' => SupplierRepo::all()], 'Suppliers');
 });
 $r->get('/suppliers/new', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Response::view('suppliers/form', ['supplier' => null], 'New supplier');
 });
 $r->get('/suppliers/{id}/edit', function ($p) {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     $s = SupplierRepo::find((int)$p['id']);
     if (!$s) Response::notFound();
     Response::view('suppliers/form', ['supplier' => $s], 'Edit supplier');
 });
 $r->post('/suppliers/save', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     SupplierRepo::save($_POST, $id);
@@ -125,17 +170,17 @@ $r->get('/projects', function () {
     Response::view('projects/index', ['projects' => ProjectRepo::all()], 'Projects');
 });
 $r->get('/projects/new', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Response::view('projects/form', ['project' => null], 'New project');
 });
 $r->get('/projects/{id}/edit', function ($p) {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     $proj = ProjectRepo::find((int)$p['id']);
     if (!$proj) Response::notFound();
     Response::view('projects/form', ['project' => $proj], 'Edit project');
 });
 $r->post('/projects/save', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     ProjectRepo::save($_POST, $id);
@@ -154,11 +199,11 @@ $r->get('/requisitions', function () {
     Response::view('requisitions/index', ['requisitions' => RequisitionRepo::all()], 'Requisitions');
 });
 $r->get('/requisitions/new', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Response::view('requisitions/form', ['projects' => ProjectRepo::all(), 'catalogue' => CatalogueRepo::all()], 'New requisition');
 });
 $r->post('/requisitions/save', function () {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $id = RequisitionRepo::create($_POST, $_POST['lines'] ?? []);
     Response::redirect('/requisitions/' . $id);
@@ -175,13 +220,21 @@ $r->get('/requisitions/{id}', function ($p) {
     ], 'MR ' . $req['mr_number']);
 });
 $r->post('/requisitions/{id}/approve', function ($p) {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('admin'); // superadmin approval gate
     Csrf::check();
     RequisitionRepo::approve((int)$p['id']);
+    if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
+    Response::redirect('/requisitions/' . (int)$p['id']);
+});
+$r->post('/requisitions/{id}/reject', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    RequisitionRepo::reject((int)$p['id']);
+    if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
     Response::redirect('/requisitions/' . (int)$p['id']);
 });
 $r->post('/requisitions/{id}/create-po', function ($p) {
-    Auth::requireRole('purchaser', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $reqId = (int)$p['id'];
     $poNumber = trim($_POST['po_number'] ?? '');
@@ -222,7 +275,7 @@ $r->get('/delivery-orders', function () {
     Response::view('delivery_orders/index', ['dos' => DeliveryOrderRepo::all()], 'Delivery Orders');
 });
 $r->get('/delivery-orders/new', function () {
-    Auth::requireRole('purchaser', 'ap', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
     Response::view('delivery_orders/new', [
         'suppliers' => SupplierRepo::all(),
         'openPos'   => PurchaseOrderRepo::openForSelect(),
@@ -230,7 +283,7 @@ $r->get('/delivery-orders/new', function () {
     ], 'Capture delivery order');
 });
 $r->post('/delivery-orders/save', function () {
-    Auth::requireRole('purchaser', 'ap', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
     Csrf::check();
     if (empty($_FILES['image']['tmp_name']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
         Response::redirect('/delivery-orders/new?err=' . rawurlencode('Please attach the signed DO image.'));
@@ -315,7 +368,7 @@ $r->get('/delivery-orders/{id}', function ($p) {
     ], 'DO ' . ($do['do_number'] ?: $p['id']));
 });
 $r->post('/delivery-orders/{id}/relink', function ($p) {
-    Auth::requireRole('purchaser', 'ap', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
     Csrf::check();
     $poId = (int)($_POST['purchase_order_id'] ?? 0);
     DeliveryOrderRepo::setHeader((int)$p['id'], ['purchase_order_id' => $poId ?: null, 'project_id' => null, 'supplier_id' => null]);
@@ -323,7 +376,7 @@ $r->post('/delivery-orders/{id}/relink', function ($p) {
     Response::redirect('/delivery-orders/' . (int)$p['id']);
 });
 $r->post('/delivery-orders/{id}/confirm', function ($p) {
-    Auth::requireRole('purchaser', 'ap', 'admin');
+    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
     Csrf::check();
     MatchingService::commit((int)$p['id'], $_POST['line'] ?? []);
     Response::redirect('/delivery-orders/' . (int)$p['id']);

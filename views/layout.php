@@ -2,12 +2,16 @@
 /** @var string $content  @var string $title */
 use App\Auth;
 use App\Router;
+use App\Repo\RequisitionRepo;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $path = Router::path();
-$nav = function (string $href, string $label, string $icon) use ($base, $path) {
+$nav = function (string $href, string $label, string $icon, ?int $badge = null) use ($base, $path) {
     $active = ($href === '/' ? $path === '/' : str_starts_with($path, $href)) ? 'active' : '';
-    echo '<a class="' . $active . '" href="' . e($base . $href) . '">' . $icon . ' <span>' . e($label) . '</span></a>';
+    $b = $badge ? ' <span class="nav-badge">' . (int)$badge . '</span>' : '';
+    echo '<a class="' . $active . '" href="' . e($base . $href) . '">' . $icon . ' <span>' . e($label) . '</span>' . $b . '</a>';
 };
+$isAdmin = Auth::isAdmin();
+$pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,6 +28,7 @@ $nav = function (string $href, string $label, string $icon) use ($base, $path) {
     <div class="tag">Procure</div>
     <nav>
       <?php $nav('/', 'Dashboard', '▦'); ?>
+      <?php if ($isAdmin) $nav('/approvals', 'Approvals', '✔', $pending ?: null); ?>
       <?php $nav('/requisitions', 'Requisitions', '▣'); ?>
       <?php $nav('/purchase-orders', 'Purchase Orders', '▤'); ?>
       <?php $nav('/delivery-orders', 'Delivery Orders', '⇩'); ?>
@@ -38,8 +43,9 @@ $nav = function (string $href, string $label, string $icon) use ($base, $path) {
     <div class="topbar">
       <div><strong><?= e($title ?: 'Starship') ?></strong></div>
       <div class="who">
-        <?= e(Auth::user()['name'] ?? '') ?> ·
-        <a href="<?= e($base) ?>/logout">Sign out</a>
+        <span class="role-pill <?= $isAdmin ? 'admin' : 'staff' ?>"><?= e(Auth::roleLabel()) ?></span>
+        <span class="who-name"><?= e(Auth::user()['name'] ?? '') ?></span>
+        <a class="signout" href="<?= e($base) ?>/logout">Sign out</a>
       </div>
     </div>
     <div class="content"><?= $content ?></div>
