@@ -283,6 +283,11 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .xero-help{margin-top:1.2rem;border-top:1px solid var(--fe-border);padding-top:.9rem}
 .xero-help summary{cursor:pointer;font-weight:600;color:var(--fe-primary-2)}
 .xero-help ol{margin:.6rem 0 0;padding-left:1.2rem;line-height:1.9}
+.xero-logo.wa{background:linear-gradient(135deg,#25D366,#128C7E);box-shadow:0 3px 10px rgba(37,211,102,.35)}
+.senders{margin-top:1.4rem;border-top:1px solid var(--fe-border);padding-top:.4rem}
+.sender-add{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.9rem}
+.sender-add input{flex:1;min-width:160px;width:auto}
+.sender-add button{flex-shrink:0}
 
 /* Responsive */
 @media(max-width:1050px){.stat-grid{grid-template-columns:repeat(2,1fr)}}

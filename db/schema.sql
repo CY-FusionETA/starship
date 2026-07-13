@@ -295,6 +295,17 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 12c. wa_senders — WhatsApp numbers allowed to submit DOs/invoices via the
+-- Wazzup hotline (managed in the superadmin Settings tab).
+CREATE TABLE IF NOT EXISTS wa_senders (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone_e164   TEXT NOT NULL UNIQUE,
+  name         TEXT,
+  is_active    INTEGER NOT NULL DEFAULT 1,
+  last_seen_at TEXT,
+  created_at   TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 13. gemini_ocr_runs
 CREATE TABLE IF NOT EXISTS gemini_ocr_runs (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,

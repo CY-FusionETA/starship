@@ -9,6 +9,9 @@ use App\Response;
 use App\Router;
 use App\Settings;
 use App\Service\Xero\XeroOAuth;
+use App\Repo\WaSenderRepo;
+use App\Service\Wazzup\WazzupClient;
+use App\Service\Wazzup\WazzupIntake;
 use App\Repo\CatalogueRepo;
 use App\Repo\SupplierRepo;
 use App\Repo\ProjectRepo;
@@ -404,6 +407,14 @@ $r->get('/settings', function () {
         'has_secret' => XeroOAuth::clientSecret() !== '',
         'redirect_uri' => XeroOAuth::redirectUri(),
         'scopes'  => XeroOAuth::scopes(),
+        // Wazzup WhatsApp hotline
+        'wz_configured' => WazzupClient::isConfigured(),
+        'wz_enabled'    => WazzupClient::enabled(),
+        'wz_api_key'    => WazzupClient::apiKey(),
+        'wz_channel'    => WazzupClient::channelId(),
+        'wz_number'     => WazzupClient::number(),
+        'wz_webhook'    => WazzupIntake::webhookUrl(),
+        'senders'       => WaSenderRepo::all(),
         'notice'  => $_GET['ok'] ?? null,
         'error'   => $_GET['err'] ?? null,
     ], 'Settings');
@@ -447,6 +458,38 @@ $r->post('/settings/xero/disconnect', function () {
     Csrf::check();
     XeroOAuth::disconnect();
     Response::redirect('/settings?ok=' . rawurlencode('Disconnected from Xero.'));
+});
+
+// --- Wazzup WhatsApp hotline (superadmin) ---------------------------
+$r->post('/settings/wazzup/save', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    if (trim($_POST['api_key'] ?? '') !== '') Settings::set('wazzup.api_key', trim($_POST['api_key'])); // blank keeps existing
+    Settings::set('wazzup.channel_id', trim($_POST['channel_id'] ?? ''));
+    Settings::set('wazzup.number', preg_replace('/\D+/', '', $_POST['number'] ?? ''));
+    Settings::set('wazzup.enabled', isset($_POST['enabled']) ? '1' : '0');
+    Response::redirect('/settings?ok=saved#wazzup');
+});
+$r->post('/settings/wazzup/register-webhook', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $res = WazzupClient::registerWebhook(WazzupIntake::webhookUrl());
+    if (!empty($res['ok'])) Response::redirect('/settings?ok=' . rawurlencode('Webhook registered with Wazzup.') . '#wazzup');
+    Response::redirect('/settings?err=' . rawurlencode('Webhook registration failed: ' . ($res['error'] ?? 'unknown')) . '#wazzup');
+});
+$r->post('/settings/senders/add', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $phone = trim($_POST['phone'] ?? '');
+    if (WaSenderRepo::normalize($phone) === '') Response::redirect('/settings?err=' . rawurlencode('Enter a valid phone number.') . '#wazzup');
+    WaSenderRepo::add($phone, $_POST['name'] ?? '');
+    Response::redirect('/settings?ok=' . rawurlencode('Number added.') . '#wazzup');
+});
+$r->post('/settings/senders/{id}/delete', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    WaSenderRepo::delete((int)$p['id']);
+    Response::redirect('/settings?ok=' . rawurlencode('Number removed.') . '#wazzup');
 });
 
 $r->dispatch();
