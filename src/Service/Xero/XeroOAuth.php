@@ -115,6 +115,10 @@ final class XeroOAuth
     private static function store(array $tok, string $tenantId, string $tenantName): void
     {
         $expiresAt = date('Y-m-d H:i:s', time() + (int)($tok['expires_in'] ?? 1800));
+        // Remember the tenant we were connected to before overwriting the token.
+        $prev = Db::one("SELECT tenant_id FROM oauth_tokens WHERE provider = 'xero' ORDER BY updated_at DESC LIMIT 1");
+        $prevTenant = $prev['tenant_id'] ?? null;
+
         Db::q("DELETE FROM oauth_tokens WHERE provider = 'xero'");
         Db::insert('oauth_tokens', [
             'provider'      => 'xero',
@@ -125,6 +129,19 @@ final class XeroOAuth
             'expires_at'    => $expiresAt,
             'scope'         => $tok['scope'] ?? self::scopes(),
         ]);
+
+        // Reconnected to a DIFFERENT Xero org? Every already-synced PO holds an
+        // xero_po_id that exists only in the old tenant, and syncToXero() treats
+        // a non-empty xero_po_id as "already synced" — so without clearing them
+        // those POs would silently never push to the new org. A token refresh
+        // keeps the same tenant, so this only fires on a genuine tenant switch.
+        if ($prevTenant !== null && $prevTenant !== '' && $prevTenant !== $tenantId) {
+            Db::q(
+                "UPDATE purchase_orders
+                    SET xero_po_id = NULL, xero_synced_at = NULL, xero_last_error = NULL
+                  WHERE xero_po_id IS NOT NULL"
+            );
+        }
     }
 
     private static function postToken(array $fields): array
