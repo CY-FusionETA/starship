@@ -33,11 +33,6 @@ $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
       <?php $nav('/requisitions', 'Requisitions', Icons::svg('requisitions')); ?>
       <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
       <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
-      <div class="tag">Master data</div>
-      <?php $nav('/catalogue', 'Catalogue', Icons::svg('catalogue')); ?>
-      <?php $nav('/suppliers', 'Suppliers', Icons::svg('suppliers')); ?>
-      <?php $nav('/projects', 'Projects', Icons::svg('projects')); ?>
-      <?php $nav('/aliases', 'Supplier aliases', Icons::svg('aliases')); ?>
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
         <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>

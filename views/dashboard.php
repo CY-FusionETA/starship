@@ -54,18 +54,6 @@ $statusBadge = function (string $s): string {
     <div class="stat-ic"><?= App\Icons::svg('po','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['pos'] ?></div><div class="lbl">Purchase orders</div>
   </a>
-  <a class="stat accent-cat" href="<?= e($base) ?>/catalogue">
-    <div class="stat-ic"><?= App\Icons::svg('catalogue','stat-ico') ?></div>
-    <div class="num"><?= (int)$stats['catalogue'] ?></div><div class="lbl">Catalogue items</div>
-  </a>
-  <a class="stat" href="<?= e($base) ?>/suppliers">
-    <div class="stat-ic"><?= App\Icons::svg('suppliers','stat-ico') ?></div>
-    <div class="num"><?= (int)$stats['suppliers'] ?></div><div class="lbl">Suppliers</div>
-  </a>
-  <a class="stat" href="<?= e($base) ?>/projects">
-    <div class="stat-ic"><?= App\Icons::svg('projects','stat-ico') ?></div>
-    <div class="num"><?= (int)$stats['projects'] ?></div><div class="lbl">Projects / sites</div>
-  </a>
 </div>
 
 <div class="card" style="margin-top:1.25rem">
