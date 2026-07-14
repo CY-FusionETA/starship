@@ -69,7 +69,7 @@ final class RequisitionRepo
     public static function lines(int $reqId): array
     {
         $lines = Db::all(
-            "SELECT l.*, c.name AS item_name, c.item_code
+            "SELECT l.*, c.name AS item_name, c.item_code, c.unit_price AS ref_price
              FROM requisition_lines l
              LEFT JOIN catalogue_items c ON c.id = l.catalogue_item_id
              WHERE l.requisition_id = ? ORDER BY l.line_no",
@@ -95,7 +95,7 @@ final class RequisitionRepo
                 'mr_number'     => trim($header['mr_number']),
                 'project_id'    => (int)$header['project_id'],
                 'requested_by'  => trim($header['requested_by'] ?? '') ?: null,
-                'request_date'  => $header['request_date'] ?: null,
+                'request_date'  => ($header['request_date'] ?? '') ?: null,
                 'delivery_date' => trim($header['delivery_date'] ?? '') ?: null,
                 'notes'         => trim($header['notes'] ?? '') ?: null,
                 'status'        => 'draft',
@@ -119,6 +119,59 @@ final class RequisitionRepo
             }
             return $reqId;
         });
+    }
+
+    /** True when at least one PO line was raised from this requisition. */
+    public static function hasPurchaseOrders(int $id): bool
+    {
+        return (bool)Db::scalar(
+            "SELECT 1 FROM po_lines pl JOIN requisition_lines rl ON rl.id = pl.requisition_line_id
+             WHERE rl.requisition_id = ? LIMIT 1",
+            [$id]
+        );
+    }
+
+    /** Replace a draft requisition's header + lines. Only valid while status = 'draft'. */
+    public static function update(int $id, array $header, array $lines): void
+    {
+        Db::tx(function () use ($id, $header, $lines) {
+            Db::update('requisitions', $id, [
+                'mr_number'     => trim($header['mr_number']),
+                'project_id'    => (int)$header['project_id'],
+                'requested_by'  => trim($header['requested_by'] ?? '') ?: null,
+                'request_date'  => ($header['request_date'] ?? '') ?: null,
+                'delivery_date' => trim($header['delivery_date'] ?? '') ?: null,
+                'notes'         => trim($header['notes'] ?? '') ?: null,
+            ]);
+            Db::q("DELETE FROM requisition_lines WHERE requisition_id = ?", [$id]);
+            $no = 0;
+            foreach ($lines as $l) {
+                $desc = trim($l['raw_description'] ?? '');
+                if ($desc === '' && empty($l['catalogue_item_id'])) continue;
+                $no++;
+                Db::insert('requisition_lines', [
+                    'requisition_id'    => $id,
+                    'line_no'           => $no,
+                    'catalogue_item_id' => !empty($l['catalogue_item_id']) ? (int)$l['catalogue_item_id'] : null,
+                    'raw_description'   => $desc !== '' ? $desc : ($l['item_name'] ?? 'Item'),
+                    'model_type'        => trim($l['model_type'] ?? '') ?: null,
+                    'qty'               => (float)$l['qty'],
+                    'uom'               => trim($l['uom'] ?? '') ?: null,
+                    'remarks'           => trim($l['remarks'] ?? '') ?: null,
+                ]);
+            }
+            AuditRepo::log('requisition', $id, 'edit');
+        });
+    }
+
+    /** Delete a requisition + its lines. Blocked once any PO has been raised from it. */
+    public static function delete(int $id): void
+    {
+        if (self::hasPurchaseOrders($id)) {
+            throw new \RuntimeException('Cannot delete: purchase orders were already raised from this requisition.');
+        }
+        Db::q("DELETE FROM requisitions WHERE id = ?", [$id]); // requisition_lines cascade
+        AuditRepo::log('requisition', $id, 'delete');
     }
 
     public static function approve(int $id): void

@@ -18,6 +18,14 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
   </div>
   <div>
     <span class="badge <?= ['draft'=>'muted','approved'=>'brand','partially_ordered'=>'warn','fully_ordered'=>'ok'][$req['status']] ?? 'muted' ?>" style="font-size:.8rem"><?= e(str_replace('_',' ',$req['status'])) ?></span>
+    <?php if ($req['status'] === 'draft' && Auth::is('staff', 'purchaser')): ?>
+      <a class="btn sm ghost" href="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/edit">Edit</a>
+    <?php endif; ?>
+    <?php if (Auth::isAdmin()): ?>
+      <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/delete" onsubmit="return confirm('Delete requisition <?= e($req['mr_number']) ?>? This cannot be undone.')" style="display:inline">
+        <?= Csrf::field() ?><button class="btn sm ghost-danger">Delete</button>
+      </form>
+    <?php endif; ?>
     <?php if ($req['status'] === 'draft'): ?>
       <?php if (Auth::isAdmin()): ?>
         <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/reject" onsubmit="return confirm('Reject this requisition?')" style="display:inline">

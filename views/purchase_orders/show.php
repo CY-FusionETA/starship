@@ -1,4 +1,4 @@
-<?php /** @var array $po @var array $lines */
+<?php /** @var array $po @var array $lines @var ?string $error */
 use App\Auth;
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
@@ -6,6 +6,7 @@ $sb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'=>
 $xflash = $_GET['xero'] ?? null;
 $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connected — nothing was sent. Connect it in Settings.', 'err'=>'Xero push failed — see the error below.'][$xflash] ?? null; ?>
 <?php if ($flashMsg): ?><div class="<?= $xflash==='ok'?'notice':'alert' ?>"><?= e($flashMsg) ?></div><?php endif; ?>
+<?php if (!empty($error)): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
 <div class="toolbar">
   <div>
     <h1 style="margin:0">PO <?= e($po['po_number']) ?></h1>
@@ -56,4 +57,25 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
     <tfoot><tr><th colspan="6" style="text-align:right">Total (MYR)</th><th><?= number_format($tot,2) ?></th><th></th></tr></tfoot>
   </table>
 </div>
+<?php if (Auth::isAdmin()): ?>
+<div class="card">
+  <details>
+    <summary style="cursor:pointer;font-weight:600">Edit / delete this PO</summary>
+    <form method="post" action="<?= e($base) ?>/purchase-orders/<?= (int)$po['id'] ?>/edit" class="row" style="align-items:flex-end;margin-top:1rem">
+      <?= Csrf::field() ?>
+      <div><label>PO number</label><input name="po_number" value="<?= e($po['po_number']) ?>" required></div>
+      <div><label>Order date</label><input name="order_date" type="date" value="<?= e($po['order_date']) ?>"></div>
+      <div style="flex:0"><button class="btn secondary">Save changes</button></div>
+    </form>
+    <?php if (!empty($po['xero_po_id'])): ?>
+      <p class="muted small" style="margin:.6rem 0 0">Note: this PO is already synced to Xero — edits here do not update the Xero copy.</p>
+    <?php endif; ?>
+    <hr style="border:none;border-top:1px solid var(--fe-border);margin:1rem 0">
+    <form method="post" action="<?= e($base) ?>/purchase-orders/<?= (int)$po['id'] ?>/delete" onsubmit="return confirm('Delete PO <?= e($po['po_number']) ?>? Ordered quantities on the source requisition will be released. This cannot be undone.')">
+      <?= Csrf::field() ?><button class="btn ghost-danger">Delete purchase order</button>
+      <span class="muted small">Blocked if goods have already been delivered against it.</span>
+    </form>
+  </details>
+</div>
+<?php endif; ?>
 <p><a href="<?= e($base) ?>/purchase-orders">← All purchase orders</a></p>

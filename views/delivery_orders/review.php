@@ -136,4 +136,26 @@ $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','excepti
   </div>
 </div>
 
+<div class="card">
+  <details>
+    <summary style="cursor:pointer;font-weight:600">Edit delivery order details<?= \App\Auth::isAdmin() ? ' / delete' : '' ?></summary>
+    <form method="post" action="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/edit" style="margin-top:1rem">
+      <?= Csrf::field() ?>
+      <div class="row">
+        <div><label>DO number</label><input name="do_number" value="<?= e($do['do_number']) ?>"></div>
+        <div><label>Delivery date</label><input name="delivery_date" value="<?= e($do['delivery_date']) ?>" placeholder="YYYY-MM-DD"></div>
+      </div>
+      <label>Notes</label>
+      <input name="handwritten_notes" value="<?= e($do['handwritten_notes']) ?>">
+      <div style="margin-top:.8rem"><button class="btn secondary">Save details</button></div>
+    </form>
+    <?php if (\App\Auth::isAdmin()): ?>
+      <hr style="border:none;border-top:1px solid var(--fe-border);margin:1rem 0">
+      <form method="post" action="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/delete" onsubmit="return confirm('Delete this delivery order? Any receipts it posted will be reversed on the PO. This cannot be undone.')">
+        <?= Csrf::field() ?><button class="btn ghost-danger">Delete delivery order</button>
+      </form>
+    <?php endif; ?>
+  </details>
+</div>
+
 <p><a href="<?= e($base) ?>/delivery-orders">← All delivery orders</a></p>

@@ -145,10 +145,10 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .item-card:hover{box-shadow:var(--shadow-md);border-color:#c7d2fe;transform:translateY(-1px)}
 .item-main .nm{font-weight:600}
 .item-main .sub{color:var(--fe-muted);font-size:.82rem;margin-top:.15rem}
-.item-price{text-align:right;white-space:nowrap;min-width:92px}
-.item-price .amt{display:block;font-weight:700;line-height:1.2}
-.item-price .amt.none{font-weight:500;color:var(--fe-muted);font-size:.85rem}
-.item-price .per{display:block;color:var(--fe-muted);font-size:.72rem;font-weight:400;margin-top:.05rem}
+.item-price{display:flex;align-items:baseline;justify-content:flex-end;gap:.3rem;white-space:nowrap;min-width:118px}
+.item-price .amt{font-weight:700}
+.item-price .amt.none{font-weight:500;color:var(--fe-muted);font-size:.9rem}
+.item-price .per{color:var(--fe-muted);font-size:.78rem;font-weight:400}
 .item-add{white-space:nowrap}
 .badge.code{background:#eef2ff;color:var(--fe-primary-2);font-family:ui-monospace,monospace}
 .pill-added{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;border-radius:var(--radius-btn);padding:.4rem .9rem;font-weight:600;font-size:.85rem}
@@ -241,6 +241,8 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .empty-emoji{font-size:2.6rem;color:var(--fe-success);margin-bottom:.3rem}
 
 /* Buttons: ghost danger */
+.btn.ghost{background:#fff;color:var(--fe-muted);border:1.5px solid var(--fe-border);box-shadow:none;padding:.32rem .8rem}
+.btn.ghost:hover{background:#f7f9ff;border-color:#c7d2e6;color:var(--fe-primary);filter:none;box-shadow:none}
 .btn.ghost-danger{background:#fff;color:var(--fe-danger);border:1.5px solid #fecaca;box-shadow:none;padding:.32rem .8rem}
 .btn.ghost-danger:hover{background:#fef2f2;border-color:var(--fe-danger);color:#b91c1c;filter:none;box-shadow:none}
 .row-actions{display:flex;gap:.4rem;white-space:nowrap}

@@ -261,6 +261,35 @@ $r->post('/requisitions/{id}/create-po', function ($p) {
     }
     Response::redirect('/purchase-orders/' . $poId);
 });
+$r->get('/requisitions/{id}/edit', function ($p) {
+    Auth::requireRole('staff', 'purchaser', 'admin');
+    $req = RequisitionRepo::find((int)$p['id']);
+    if (!$req) Response::notFound();
+    if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . (int)$p['id'] . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
+    Response::view('requisitions/form', [
+        'projects' => ProjectRepo::all(),
+        'catalogue' => CatalogueRepo::all(),
+        'req'      => $req,
+        'lines'    => RequisitionRepo::lines((int)$p['id']),
+    ], 'Edit MR ' . $req['mr_number']);
+});
+$r->post('/requisitions/{id}/update', function ($p) {
+    Auth::requireRole('staff', 'purchaser', 'admin');
+    Csrf::check();
+    $id = (int)$p['id'];
+    $req = RequisitionRepo::find($id);
+    if (!$req) Response::notFound();
+    if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
+    RequisitionRepo::update($id, $_POST, $_POST['lines'] ?? []);
+    Response::redirect('/requisitions/' . $id);
+});
+$r->post('/requisitions/{id}/delete', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try { RequisitionRepo::delete((int)$p['id']); }
+    catch (\Throwable $ex) { Response::redirect('/requisitions/' . (int)$p['id'] . '?err=' . rawurlencode($ex->getMessage())); }
+    Response::redirect('/requisitions');
+});
 
 // --- Purchase Orders ------------------------------------------------
 $r->get('/purchase-orders', function () {
@@ -271,7 +300,7 @@ $r->get('/purchase-orders/{id}', function ($p) {
     Auth::require();
     $po = PurchaseOrderRepo::find((int)$p['id']);
     if (!$po) Response::notFound();
-    Response::view('purchase_orders/show', ['po' => $po, 'lines' => PurchaseOrderRepo::lines((int)$p['id'])], 'PO ' . $po['po_number']);
+    Response::view('purchase_orders/show', ['po' => $po, 'lines' => PurchaseOrderRepo::lines((int)$p['id']), 'error' => $_GET['err'] ?? null], 'PO ' . $po['po_number']);
 });
 // Manual Xero push / retry (superadmin) — for POs raised while Xero was down or disconnected.
 $r->post('/purchase-orders/{id}/xero-sync', function ($p) {
@@ -280,6 +309,20 @@ $r->post('/purchase-orders/{id}/xero-sync', function ($p) {
     $res = PurchaseOrderRepo::syncToXero((int)$p['id']);
     $q = !empty($res['xero_po_id']) ? 'ok' : (!empty($res['stubbed']) ? 'stub' : 'err');
     Response::redirect('/purchase-orders/' . (int)$p['id'] . '?xero=' . $q);
+});
+$r->post('/purchase-orders/{id}/edit', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try { PurchaseOrderRepo::editHeader((int)$p['id'], $_POST['po_number'] ?? '', ($_POST['order_date'] ?? '') ?: null); }
+    catch (\Throwable $ex) { Response::redirect('/purchase-orders/' . (int)$p['id'] . '?err=' . rawurlencode($ex->getMessage())); }
+    Response::redirect('/purchase-orders/' . (int)$p['id']);
+});
+$r->post('/purchase-orders/{id}/delete', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try { PurchaseOrderRepo::delete((int)$p['id']); }
+    catch (\Throwable $ex) { Response::redirect('/purchase-orders/' . (int)$p['id'] . '?err=' . rawurlencode($ex->getMessage())); }
+    Response::redirect('/purchase-orders');
 });
 
 // --- Delivery Orders (capture + 3-way match) ------------------------
@@ -393,6 +436,19 @@ $r->post('/delivery-orders/{id}/confirm', function ($p) {
     Csrf::check();
     MatchingService::commit((int)$p['id'], $_POST['line'] ?? []);
     Response::redirect('/delivery-orders/' . (int)$p['id']);
+});
+$r->post('/delivery-orders/{id}/edit', function ($p) {
+    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Csrf::check();
+    DeliveryOrderRepo::editHeader((int)$p['id'], $_POST);
+    Response::redirect('/delivery-orders/' . (int)$p['id']);
+});
+$r->post('/delivery-orders/{id}/delete', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try { DeliveryOrderRepo::delete((int)$p['id']); }
+    catch (\Throwable $ex) { Response::redirect('/delivery-orders/' . (int)$p['id'] . '?err=' . rawurlencode($ex->getMessage())); }
+    Response::redirect('/delivery-orders');
 });
 
 // --- Settings (superadmin: Xero connection & config) ----------------

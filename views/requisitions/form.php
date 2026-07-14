@@ -1,23 +1,42 @@
-<?php /** @var array $projects */
+<?php /** @var array $projects @var ?array $req @var ?array $lines */
 use App\Csrf;
-$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
-<h1 style="margin-bottom:.2rem">New Material Requisition</h1>
+$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
+$editing = !empty($req);
+$action  = $editing ? "/requisitions/{$req['id']}/update" : "/requisitions/save";
+$seed = [];
+if ($editing) {
+    $ci = 0;
+    foreach (($lines ?? []) as $l) {
+        $isCustom = empty($l['catalogue_item_id']);
+        $seed[] = [
+            'key'    => $isCustom ? ('x' . $ci++) : ('c' . (int)$l['catalogue_item_id']),
+            'id'     => $isCustom ? null : (int)$l['catalogue_item_id'],
+            'code'   => $isCustom ? 'custom' : ($l['item_code'] ?? ''),
+            'name'   => $isCustom ? $l['raw_description'] : ($l['item_name'] ?: $l['raw_description']),
+            'uom'    => $l['uom'] ?: 'nos',
+            'price'  => (!$isCustom && $l['ref_price'] !== null) ? (float)$l['ref_price'] : null,
+            'qty'    => (float)$l['qty'],
+            'custom' => $isCustom,
+        ];
+    }
+} ?>
+<h1 style="margin-bottom:.2rem"><?= $editing ? 'Edit Material Requisition' : 'New Material Requisition' ?></h1>
 <p class="muted small" style="margin-top:0">Form GE(S)-PU-F01/1 — search the catalogue and add parts to the requisition.</p>
 
-<form id="mrForm" method="post" action="<?= e($base) ?>/requisitions/save">
+<form id="mrForm" method="post" action="<?= e($base . $action) ?>">
   <?= Csrf::field() ?>
   <div class="card">
     <div class="rq-head">
-      <div class="row"><label>MR No. *</label><input name="mr_number" required placeholder="48"></div>
+      <div class="row"><label>MR No. *</label><input name="mr_number" required placeholder="48" value="<?= $editing ? e($req['mr_number']) : '' ?>"></div>
       <div class="row"><label>Project *</label>
         <select name="project_id" required>
           <option value="">— select —</option>
-          <?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['project_code']) ?> — <?= e($p['name']) ?></option><?php endforeach; ?>
+          <?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>" <?= ($editing && (int)$req['project_id'] === (int)$p['id']) ? 'selected' : '' ?>><?= e($p['project_code']) ?> — <?= e($p['name']) ?></option><?php endforeach; ?>
         </select>
       </div>
-      <div class="row"><label>Requested by</label><input name="requested_by" placeholder="ARASH"></div>
-      <div class="row"><label>Request date</label><input name="request_date" type="date"></div>
-      <div class="row"><label>Delivery date</label><input name="delivery_date" placeholder="A.S.A.P."></div>
+      <div class="row"><label>Requested by</label><input name="requested_by" placeholder="ARASH" value="<?= $editing ? e($req['requested_by']) : '' ?>"></div>
+      <div class="row"><label>Request date</label><input name="request_date" type="date" value="<?= $editing ? e($req['request_date']) : '' ?>"></div>
+      <div class="row"><label>Delivery date</label><input name="delivery_date" placeholder="A.S.A.P." value="<?= $editing ? e($req['delivery_date']) : '' ?>"></div>
     </div>
   </div>
 
@@ -50,7 +69,7 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
       <div class="cart-foot">
         <div class="cart-total"><span class="muted">Estimated value</span><span class="v" id="total">RM 0.00</span></div>
         <div id="lineInputs"></div>
-        <button class="btn" id="raise" style="width:100%" disabled>Raise requisition →</button>
+        <button class="btn" id="raise" style="width:100%" disabled><?= $editing ? 'Save changes →' : 'Raise requisition →' ?></button>
       </div>
     </div>
   </div>
@@ -121,6 +140,9 @@ const BASE = <?= json_encode($base) ?>;
 const CSRF = <?= json_encode(Csrf::token()) ?>;
 const cart = new Map();      // id -> {id, code, name, uom, price, qty, custom}
 let items = [], customSeq = 0;
+const SEED = <?= json_encode($seed) ?>;
+SEED.forEach(l=>{ cart.set(l.key,{id:l.id,code:l.code,name:l.name,uom:l.uom,price:l.price,qty:l.qty,custom:l.custom}); });
+customSeq = SEED.filter(l=>l.custom).length;
 
 async function load(q){
   const r = await fetch(`${BASE}/catalogue/search.json?q=${encodeURIComponent(q||'')}`, {headers:{'X-Requested-With':'fetch'}});
@@ -132,8 +154,8 @@ function renderItems(){
   document.getElementById('items').innerHTML = items.map(it => {
     const added = cart.has('c'+it.id);
     const price = it.unit_price!=null
-      ? `<span class="amt">RM ${fmt(it.unit_price)}</span><span class="per">per ${esc(it.uom)}</span>`
-      : `<span class="amt none">No ref price</span><span class="per">per ${esc(it.uom)}</span>`;
+      ? `<span class="amt">RM ${fmt(it.unit_price)}</span><span class="per">/ ${esc(it.uom)}</span>`
+      : `<span class="amt none">No ref price</span><span class="per">/ ${esc(it.uom)}</span>`;
     const sub = [it.brand, it.model, it.category].filter(Boolean).map(esc).join(' · ');
     return `<div class="item-card">
       <div class="item-main"><div class="nm">${esc(it.name)} <span class="badge code">${esc(it.item_code)}</span></div>
@@ -254,5 +276,6 @@ let t; document.getElementById('q').addEventListener('input',e=>{ clearTimeout(t
 function chip(v){ document.getElementById('q').value=v; load(v); }
 function fmt(n){ return (Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+renderCart();
 load('');
 </script>

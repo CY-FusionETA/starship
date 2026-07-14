@@ -20,7 +20,7 @@ $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= e($title ?: 'Starship') ?> | Starship</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= e($base) ?>/public/css/app.css">
+<link rel="stylesheet" href="<?= e($base) ?>/public/css/app.css?v=<?= @filemtime(APP_ROOT . '/public/css/app.css') ?: '1' ?>">
 </head>
 <body>
 <div class="app">

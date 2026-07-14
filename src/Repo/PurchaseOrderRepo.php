@@ -166,6 +166,56 @@ final class PurchaseOrderRepo
         return $poId;
     }
 
+    /** Edit PO header fields. Throws if the new PO number clashes with another PO. */
+    public static function editHeader(int $id, string $poNumber, ?string $orderDate): void
+    {
+        $poNumber = trim($poNumber);
+        if ($poNumber === '') throw new \RuntimeException('PO number is required.');
+        $clash = Db::one("SELECT id FROM purchase_orders WHERE po_number = ? AND id <> ?", [$poNumber, $id]);
+        if ($clash) throw new \RuntimeException('PO number "' . $poNumber . '" already exists.');
+        Db::update('purchase_orders', $id, [
+            'po_number'      => $poNumber,
+            'po_number_norm' => Normalizer::poNumber($poNumber),
+            'order_date'     => $orderDate ?: null,
+        ]);
+        AuditRepo::log('purchase_order', $id, 'edit', ['po_number' => $poNumber]);
+    }
+
+    /**
+     * Delete a PO. Blocked when any delivery order has been received against it.
+     * Otherwise the qty_ordered rolled onto the source requisition lines is
+     * given back, the requisition status is recomputed, and po_lines cascade.
+     */
+    public static function delete(int $id): void
+    {
+        $po = self::find($id);
+        if (!$po) throw new \RuntimeException('Purchase order not found.');
+
+        $doRef  = Db::scalar("SELECT COUNT(*) FROM delivery_orders WHERE purchase_order_id = ?", [$id]);
+        $lineRef = Db::scalar(
+            "SELECT COUNT(*) FROM do_lines dl JOIN po_lines pl ON pl.id = dl.matched_po_line_id
+             WHERE pl.purchase_order_id = ?",
+            [$id]
+        );
+        if ((int)$doRef > 0 || (int)$lineRef > 0) {
+            throw new \RuntimeException('Cannot delete: goods have been delivered against this PO. Remove the linked delivery order(s) first.');
+        }
+
+        Db::tx(function () use ($id, $po) {
+            $reqIds = [];
+            foreach (Db::all("SELECT requisition_line_id AS rl, qty_ordered AS q FROM po_lines WHERE purchase_order_id = ?", [$id]) as $pl) {
+                $rlId = (int)($pl['rl'] ?? 0);
+                if (!$rlId) continue;
+                Db::q("UPDATE requisition_lines SET qty_ordered = MAX(0, qty_ordered - ?) WHERE id = ?", [(float)$pl['q'], $rlId]);
+                $rid = Db::scalar("SELECT requisition_id FROM requisition_lines WHERE id = ?", [$rlId]);
+                if ($rid) $reqIds[(int)$rid] = true;
+            }
+            Db::q("DELETE FROM purchase_orders WHERE id = ?", [$id]);
+            foreach (array_keys($reqIds) as $rid) RequisitionRepo::recompute($rid);
+            AuditRepo::log('purchase_order', $id, 'delete', ['po_number' => $po['po_number']]);
+        });
+    }
+
     /**
      * Create the matching Purchase Order in Xero. Idempotent-ish: if the PO is
      * already synced it returns early. Records xero_po_id + xero_synced_at on

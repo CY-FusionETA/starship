@@ -81,4 +81,47 @@ final class DeliveryOrderRepo
     {
         Db::update('do_lines', $lineId, $fields);
     }
+
+    /** Edit the header fields a user can safely change (does not touch line matching). */
+    public static function editHeader(int $id, array $h): void
+    {
+        Db::update('delivery_orders', $id, [
+            'do_number'         => trim($h['do_number'] ?? '') ?: null,
+            'delivery_date'     => trim($h['delivery_date'] ?? '') ?: null,
+            'handwritten_notes' => trim($h['handwritten_notes'] ?? '') ?: null,
+        ]);
+        AuditRepo::log('delivery_order', $id, 'edit');
+    }
+
+    /**
+     * Delete a DO. If it was confirmed, first reverse the receipts it posted so
+     * PO balances stay correct. do_lines + OCR runs cascade on the row delete.
+     */
+    public static function delete(int $id): void
+    {
+        Db::tx(function () use ($id) {
+            $posted = Db::all(
+                "SELECT matched_po_line_id AS pl, qty_accepted AS qty FROM do_lines
+                 WHERE delivery_order_id = ? AND is_confirmed = 1 AND matched_po_line_id IS NOT NULL",
+                [$id]
+            );
+            $touched = [];
+            foreach ($posted as $row) {
+                $qty = (float)($row['qty'] ?? 0);
+                $poLineId = (int)$row['pl'];
+                if ($qty <= 0 || !$poLineId) continue;
+                Db::q("UPDATE po_lines SET qty_received = MAX(0, qty_received - ?) WHERE id = ?", [$qty, $poLineId]);
+                $pl = Db::one("SELECT purchase_order_id, qty_received, qty_ordered FROM po_lines WHERE id = ?", [$poLineId]);
+                if ($pl) {
+                    $recv = (float)$pl['qty_received']; $ord = (float)$pl['qty_ordered'];
+                    $st = $recv > $ord + 1e-6 ? 'over_received' : (abs($recv - $ord) < 1e-6 && $ord > 0 ? 'fully_received' : ($recv > 0 ? 'partially_received' : 'open'));
+                    Db::update('po_lines', $poLineId, ['line_status' => $st]);
+                    $touched[(int)$pl['purchase_order_id']] = true;
+                }
+            }
+            Db::q("DELETE FROM delivery_orders WHERE id = ?", [$id]);
+            foreach (array_keys($touched) as $poId) PurchaseOrderRepo::recomputeStatus($poId);
+            AuditRepo::log('delivery_order', $id, 'delete');
+        });
+    }
 }
