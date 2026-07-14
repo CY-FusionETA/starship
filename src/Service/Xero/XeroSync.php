@@ -30,11 +30,15 @@ final class XeroSync
     {
         $created = 0; $updated = 0; $total = 0;
         for ($page = 1; $page <= self::PAGE_MAX; $page++) {
-            $json = self::get('Contacts', ['page' => $page, 'includeArchived' => 'false']);
+            // Suppliers only: Xero's IsSupplier flag (true once a contact has had a
+            // bill/PO). Filtered server-side; the loop guard is a belt-and-braces
+            // backstop in case a tenant ignores the where clause.
+            $json = self::get('Contacts', ['page' => $page, 'includeArchived' => 'false', 'where' => 'IsSupplier==true']);
             $rows = $json['Contacts'] ?? [];
             if (!$rows) break;
             foreach ($rows as $c) {
                 if (($c['ContactStatus'] ?? 'ACTIVE') === 'ARCHIVED') continue;
+                if (($c['IsSupplier'] ?? null) !== true) continue;
                 $total++;
                 self::upsertContact($c, $created, $updated);
             }
