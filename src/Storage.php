@@ -12,9 +12,14 @@ final class Storage
         $ext = preg_replace('/[^a-z0-9]/i', '', $ext) ?: 'jpg';
         $rel = 'do/' . date('Y') . '/' . date('m');
         $dir = STORAGE_ROOT . '/' . $rel;
-        if (!is_dir($dir)) mkdir($dir, 0770, true);
+        if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
+            throw new \RuntimeException("Cannot create storage directory: $rel");
+        }
         $name = bin2hex(random_bytes(16)) . '.' . strtolower($ext);
-        file_put_contents($dir . '/' . $name, $bytes);
+        $abs  = $dir . '/' . $name;
+        if (file_put_contents($abs, $bytes) === false || !is_file($abs)) {
+            throw new \RuntimeException("Failed to write upload to storage ($rel) — check directory permissions.");
+        }
         return $rel . '/' . $name;
     }
 

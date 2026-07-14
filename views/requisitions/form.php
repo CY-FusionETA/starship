@@ -36,7 +36,7 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
       <div class="item-list" id="items"></div>
       <div class="add-row">
         <button type="button" class="btn sm" onclick="openNewProduct()">＋ New product</button>
-        <button type="button" class="btn sm secondary" onclick="addCustom()">＋ One-off (non-catalogue) item</button>
+        <button type="button" class="btn sm secondary" onclick="openOneOff()">＋ One-off (non-catalogue) item</button>
       </div>
       <p class="muted small" style="margin:.5rem 0 0">
         <strong>New product</strong> saves to the catalogue for everyone. <strong>One-off</strong> adds a free-text line to this requisition only.
@@ -88,6 +88,34 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
   </div>
 </div>
 
+<!-- One-off (non-catalogue) line modal -->
+<div class="modal-overlay" id="ooOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ooTitle">
+    <div class="modal-h">
+      <h3 id="ooTitle">One-off item</h3>
+      <button type="button" class="modal-x" onclick="closeOneOff()" aria-label="Close">×</button>
+    </div>
+    <div class="modal-b">
+      <p class="muted small" style="margin-top:0">Adds a free-text line to <strong>this requisition only</strong> — it is not saved to the catalogue.</p>
+      <div id="ooErr" class="alert" hidden></div>
+      <label>Description *</label>
+      <input id="oo_name" placeholder="e.g. Site-specific bracket, fabricated on order" autocomplete="off">
+      <div class="row">
+        <div><label>Quantity *</label><input id="oo_qty" type="number" step="any" min="1" value="1"></div>
+        <div><label>UOM</label><input id="oo_uom" placeholder="nos / ft / m" value="nos"></div>
+      </div>
+      <div class="row">
+        <div><label>Est. unit price (MYR)</label><input id="oo_price" type="number" step="any" min="0" placeholder="optional"></div>
+        <div></div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button type="button" class="btn secondary" onclick="closeOneOff()">Cancel</button>
+      <button type="button" class="btn" onclick="saveOneOff()">Add to requisition →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const BASE = <?= json_encode($base) ?>;
 const CSRF = <?= json_encode(Csrf::token()) ?>;
@@ -103,7 +131,9 @@ function renderItems(){
   document.getElementById('count').textContent = `${items.length} item${items.length==1?'':'s'}`;
   document.getElementById('items').innerHTML = items.map(it => {
     const added = cart.has('c'+it.id);
-    const price = it.unit_price!=null ? `RM ${fmt(it.unit_price)}<span class="per">per ${esc(it.uom)}</span>` : `<span class="per">no ref price</span>`;
+    const price = it.unit_price!=null
+      ? `<span class="amt">RM ${fmt(it.unit_price)}</span><span class="per">per ${esc(it.uom)}</span>`
+      : `<span class="amt none">No ref price</span><span class="per">per ${esc(it.uom)}</span>`;
     const sub = [it.brand, it.model, it.category].filter(Boolean).map(esc).join(' · ');
     return `<div class="item-card">
       <div class="item-main"><div class="nm">${esc(it.name)} <span class="badge code">${esc(it.item_code)}</span></div>
@@ -120,10 +150,31 @@ function addItem(it){
   if(!cart.has(key)) cart.set(key,{id:it.id,code:it.item_code,name:it.name,uom:it.uom,price:it.unit_price,qty:1,custom:false});
   renderItems(); renderCart();
 }
-function addCustom(){
-  const name = prompt('Item description (non-catalogue):'); if(!name) return;
+// ---- One-off (non-catalogue) line ----
+const ooOverlay = document.getElementById('ooOverlay');
+function openOneOff(){
+  document.getElementById('ooErr').hidden = true;
+  document.getElementById('oo_name').value = '';
+  document.getElementById('oo_qty').value = '1';
+  document.getElementById('oo_uom').value = 'nos';
+  document.getElementById('oo_price').value = '';
+  ooOverlay.hidden = false;
+  setTimeout(()=>document.getElementById('oo_name').focus(),30);
+}
+function closeOneOff(){ ooOverlay.hidden = true; }
+ooOverlay.addEventListener('click',e=>{ if(e.target===ooOverlay) closeOneOff(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !ooOverlay.hidden) closeOneOff(); });
+function saveOneOff(){
+  const err = document.getElementById('ooErr');
+  const name = document.getElementById('oo_name').value.trim();
+  if(!name){ err.textContent='Description is required.'; err.hidden=false; document.getElementById('oo_name').focus(); return; }
+  const qty = Math.max(1, parseFloat(document.getElementById('oo_qty').value) || 1);
+  const uom = document.getElementById('oo_uom').value.trim() || 'nos';
+  const priceRaw = document.getElementById('oo_price').value.trim();
+  const price = priceRaw === '' ? null : (parseFloat(priceRaw) || 0);
   const key='x'+(customSeq++);
-  cart.set(key,{id:null,code:'custom',name:name,uom:'nos',price:null,qty:1,custom:true});
+  cart.set(key,{id:null,code:'custom',name,uom,price,qty,custom:true});
+  closeOneOff();
   renderCart();
 }
 

@@ -11,6 +11,7 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
 <?php if ($notice): ?><div class="notice"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
 
+<div class="settings-grid">
 <div class="card xero-card">
   <div class="xero-head">
     <div class="xero-title">
@@ -161,6 +162,7 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
       <button class="btn">+ Add number</button>
     </form>
   </div>
+</div>
 </div>
 
 <script>

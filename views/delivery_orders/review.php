@@ -119,8 +119,13 @@ $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','excepti
   <!-- image -->
   <div class="card">
     <h3>Signed DO</h3>
-    <?php $ext = strtolower(pathinfo($do['image_path'], PATHINFO_EXTENSION)); ?>
-    <?php if ($ext === 'pdf'): ?>
+    <?php
+      $ext = strtolower(pathinfo($do['image_path'], PATHINFO_EXTENSION));
+      $fileExists = $do['image_path'] && is_file(\App\Storage::absPath($do['image_path']));
+    ?>
+    <?php if (!$fileExists): ?>
+      <p class="muted small" style="margin:0">The uploaded file is no longer available. Please re-capture this delivery order.</p>
+    <?php elseif ($ext === 'pdf'): ?>
       <a class="btn secondary" href="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/image" target="_blank">Open PDF</a>
     <?php else: ?>
       <a href="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/image" target="_blank">
