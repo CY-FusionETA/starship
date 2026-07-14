@@ -517,6 +517,7 @@ $r->get('/settings', function () {
         'has_secret' => XeroOAuth::clientSecret() !== '',
         'redirect_uri' => XeroOAuth::redirectUri(),
         'scopes'  => XeroOAuth::scopes(),
+        'supplier_group' => (string)Settings::raw('xero.supplier_group', 'Suppliers'),
         // Wazzup WhatsApp hotline
         'wz_configured' => WazzupClient::isConfigured(),
         'wz_enabled'    => WazzupClient::enabled(),
@@ -537,6 +538,7 @@ $r->post('/settings/save', function () {
     if (trim($_POST['client_secret'] ?? '') !== '') Settings::set('xero.client_secret', trim($_POST['client_secret']));
     Settings::set('xero.redirect_uri', trim($_POST['redirect_uri'] ?? ''));
     Settings::set('xero.scopes', trim($_POST['scopes'] ?? '') ?: XeroOAuth::DEFAULT_SCOPES);
+    Settings::set('xero.supplier_group', trim($_POST['supplier_group'] ?? ''));
     Settings::set('xero.enabled', isset($_POST['enabled']) ? '1' : '0');
     Response::redirect('/settings?ok=saved');
 });

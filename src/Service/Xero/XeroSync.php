@@ -28,24 +28,80 @@ final class XeroSync
     /** @return array{created:int,updated:int,total:int} */
     public static function pullContacts(): array
     {
-        $created = 0; $updated = 0; $total = 0;
+        // Collect from two channels, deduped by ContactID, then upsert once:
+        //  1. IsSupplier==true — Xero's derived flag (true once billed/PO'd).
+        //  2. Members of a named Xero contact group ("supplier group") — a manual
+        //     override so a new supplier syncs BEFORE its first PO.
+        $contacts = [];
         for ($page = 1; $page <= self::PAGE_MAX; $page++) {
-            // Suppliers only: Xero's IsSupplier flag (true once a contact has had a
-            // bill/PO). Filtered server-side; the loop guard is a belt-and-braces
-            // backstop in case a tenant ignores the where clause.
             $json = self::get('Contacts', ['page' => $page, 'includeArchived' => 'false', 'where' => 'IsSupplier==true']);
             $rows = $json['Contacts'] ?? [];
             if (!$rows) break;
             foreach ($rows as $c) {
                 if (($c['ContactStatus'] ?? 'ACTIVE') === 'ARCHIVED') continue;
-                if (($c['IsSupplier'] ?? null) !== true) continue;
-                $total++;
-                self::upsertContact($c, $created, $updated);
+                if (($c['IsSupplier'] ?? null) !== true) continue;   // backstop
+                if (!empty($c['ContactID'])) $contacts[$c['ContactID']] = $c;
             }
             if (count($rows) < 100) break;   // last page
         }
+
+        foreach (self::groupSupplierContacts(array_keys($contacts)) as $c) {
+            if (!empty($c['ContactID'])) $contacts[$c['ContactID']] = $c;
+        }
+
+        $created = 0; $updated = 0;
+        foreach ($contacts as $c) self::upsertContact($c, $created, $updated);
+        $total = count($contacts);
         AuditRepo::log('supplier', 0, 'xero_pull_contacts', compact('created', 'updated', 'total'));
         return compact('created', 'updated', 'total');
+    }
+
+    /**
+     * Full contact records for members of the configured "supplier group" that
+     * aren't already covered by IsSupplier. Lets an operator force-include a new
+     * supplier in Xero (add it to the group) so it appears in Starship right away.
+     *
+     * @param string[] $alreadyHave ContactIDs already collected via IsSupplier.
+     * @return array<int,array> Xero contact objects (full detail).
+     */
+    private static function groupSupplierContacts(array $alreadyHave): array
+    {
+        // raw() (not get()) so an explicitly-cleared value disables the override;
+        // an absent key defaults to a group named "Suppliers".
+        $groupName = trim((string)Settings::raw('xero.supplier_group', 'Suppliers'));
+        if ($groupName === '') return [];
+
+        $memberIds = self::supplierGroupMemberIds($groupName);
+        $missing = array_values(array_diff($memberIds, $alreadyHave));
+        if (!$missing) return [];
+
+        // /Contacts?IDs=a,b,c returns full records in one call; chunk to keep the URL sane.
+        $out = [];
+        foreach (array_chunk($missing, 50) as $chunk) {
+            $json = self::get('Contacts', ['IDs' => implode(',', $chunk)]);
+            foreach ($json['Contacts'] ?? [] as $c) {
+                if (($c['ContactStatus'] ?? 'ACTIVE') === 'ARCHIVED') continue;
+                $out[] = $c;
+            }
+        }
+        return $out;
+    }
+
+    /** ContactIDs belonging to the named (case-insensitive) active contact group. */
+    private static function supplierGroupMemberIds(string $groupName): array
+    {
+        $json = self::get('ContactGroups');
+        $groupId = null;
+        foreach ($json['ContactGroups'] ?? [] as $g) {
+            if (($g['Status'] ?? 'ACTIVE') !== 'ACTIVE') continue;
+            if (strcasecmp(trim((string)($g['Name'] ?? '')), $groupName) === 0) { $groupId = (string)$g['ContactGroupID']; break; }
+        }
+        if (!$groupId) return [];
+
+        // The single-group GET is what returns the member Contacts array.
+        $one = self::get('ContactGroups/' . $groupId);
+        $members = $one['ContactGroups'][0]['Contacts'] ?? [];
+        return array_values(array_filter(array_map(fn($c) => $c['ContactID'] ?? null, $members)));
     }
 
     private static function upsertContact(array $c, int &$created, int &$updated): void

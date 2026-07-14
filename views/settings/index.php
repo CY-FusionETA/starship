@@ -72,6 +72,9 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
       <button type="button" class="btn sm secondary" onclick="copyRedir()">Copy</button>
     </div>
 
+    <label>Supplier contact group <span class="muted small">— optional. Contacts in this Xero contact group are imported as suppliers even before their first PO. Clear to import only Xero-flagged suppliers.</span></label>
+    <input name="supplier_group" value="<?= e($supplier_group) ?>" placeholder="Suppliers">
+
     <label>Scopes</label>
     <input name="scopes" value="<?= e($scopes) ?>">
 
