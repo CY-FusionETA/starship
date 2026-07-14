@@ -27,12 +27,21 @@ final class XeroApiClient implements XeroClientInterface
                 ? ['ContactID' => $supplier['xero_contact_id']]
                 : ['Name' => $supplier['name'] ?? ($po['supplier_name'] ?? 'Supplier')];
 
+            // The project maps to a Xero tracking option; carry it on every line so
+            // spend is analysed against the project in Xero (Starship's whole point).
+            $project = Db::one("SELECT * FROM projects WHERE id = ?", [(int)($po['project_id'] ?? 0)]);
+            $tracking = (!empty($project['xero_tracking_category_id']) && !empty($project['xero_tracking_option_id']))
+                ? [['TrackingCategoryID' => $project['xero_tracking_category_id'], 'TrackingOptionID' => $project['xero_tracking_option_id']]]
+                : null;
+
             $lineItems = [];
             foreach ($lines as $l) {
                 $lineItems[] = array_filter([
                     'Description' => (string)($l['description'] ?: 'Item'),
                     'Quantity'    => (float)$l['qty_ordered'],
                     'UnitAmount'  => $l['unit_price'] !== null ? (float)$l['unit_price'] : 0,
+                    'ItemCode'    => !empty($l['xero_item_code']) ? (string)$l['xero_item_code'] : null,
+                    'Tracking'    => $tracking,
                 ], fn($v) => $v !== null);
             }
 

@@ -251,6 +251,8 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .notice{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:.7rem 1rem;border-radius:var(--radius-btn);
   margin-bottom:1rem;font-size:.9rem;display:flex;align-items:center;gap:.5rem;animation:fade-in .3s var(--ease)}
 .notice::before{content:"✓";font-weight:800}
+.notice.err{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.notice.err::before{content:"⚠"}
 
 /* Requisition builder — add-row */
 .add-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem}

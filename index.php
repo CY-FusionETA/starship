@@ -9,6 +9,7 @@ use App\Response;
 use App\Router;
 use App\Settings;
 use App\Service\Xero\XeroOAuth;
+use App\Service\Xero\XeroSync;
 use App\Repo\WaSenderRepo;
 use App\Service\Wazzup\WazzupClient;
 use App\Service\Wazzup\WazzupIntake;
@@ -78,7 +79,22 @@ $r->get('/approvals', function () {
 $r->get('/catalogue', function () {
     Auth::require();
     $q = trim($_GET['q'] ?? '');
-    Response::view('catalogue/index', ['items' => CatalogueRepo::search($q), 'q' => $q], 'Catalogue');
+    Response::view('catalogue/index', [
+        'items'         => CatalogueRepo::search($q),
+        'q'             => $q,
+        'xeroConnected' => XeroOAuth::isConnected(),
+    ], 'Catalogue');
+});
+// Pull the product list down from Xero Items (superadmin).
+$r->post('/catalogue/xero-sync', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try {
+        $r = XeroSync::pullItems();
+        Response::redirect('/catalogue?msg=xsync&c=' . (int)$r['created'] . '&u=' . (int)$r['updated']);
+    } catch (\Throwable $e) {
+        Response::redirect('/catalogue?msg=xerr&e=' . rawurlencode($e->getMessage()));
+    }
 });
 $r->get('/catalogue/search.json', function () {
     Auth::require();
@@ -108,7 +124,9 @@ $r->post('/catalogue/save', function () {
     Auth::requireRole('staff', 'purchaser', 'admin');
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
-    CatalogueRepo::save($_POST, $id);
+    $savedId = CatalogueRepo::save($_POST, $id);
+    // Mirror the product up to Xero's Products & Services (non-blocking).
+    if (Settings::bool('xero.enabled') && XeroOAuth::isConnected()) XeroSync::pushItemById($savedId);
     Response::redirect('/catalogue');
 });
 // Inline quick-add from the requisition builder — creates a catalogue item and
@@ -126,6 +144,9 @@ $r->post('/catalogue/quick-add.json', function () {
     } catch (\Throwable $ex) {
         Response::json(['error' => 'Could not save: ' . $ex->getMessage()], 422);
     }
+    // Mirror the new product up to Xero (non-blocking — a Xero hiccup must not
+    // stop the requisition builder from getting its item back).
+    if (Settings::bool('xero.enabled') && XeroOAuth::isConnected()) XeroSync::pushItemById($id);
     $c = CatalogueRepo::find($id);
     Response::json(['item' => [
         'id'         => (int)$c['id'],
@@ -149,7 +170,23 @@ $r->post('/catalogue/{id}/delete', function ($p) {
 // --- Suppliers ------------------------------------------------------
 $r->get('/suppliers', function () {
     Auth::require();
-    Response::view('suppliers/index', ['suppliers' => SupplierRepo::all()], 'Suppliers');
+    Response::view('suppliers/index', [
+        'suppliers'     => SupplierRepo::all(),
+        'xeroConnected' => XeroOAuth::isConnected(),
+        'notice'        => $_GET['ok'] ?? null,
+        'error'         => $_GET['err'] ?? null,
+    ], 'Suppliers');
+});
+// Pull the supplier list down from Xero Contacts (superadmin).
+$r->post('/suppliers/xero-sync', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try {
+        $r = XeroSync::pullContacts();
+        Response::redirect('/suppliers?ok=' . rawurlencode("Synced from Xero: {$r['created']} new, {$r['updated']} updated ({$r['total']} contacts)."));
+    } catch (\Throwable $e) {
+        Response::redirect('/suppliers?err=' . rawurlencode('Xero sync failed: ' . $e->getMessage()));
+    }
 });
 $r->get('/suppliers/new', function () {
     Auth::requireRole('staff', 'purchaser', 'admin');
@@ -172,7 +209,23 @@ $r->post('/suppliers/save', function () {
 // --- Projects -------------------------------------------------------
 $r->get('/projects', function () {
     Auth::require();
-    Response::view('projects/index', ['projects' => ProjectRepo::all()], 'Projects');
+    Response::view('projects/index', [
+        'projects'      => ProjectRepo::all(),
+        'xeroConnected' => XeroOAuth::isConnected(),
+        'notice'        => $_GET['ok'] ?? null,
+        'error'         => $_GET['err'] ?? null,
+    ], 'Projects');
+});
+// Pull projects from the Xero "Project" tracking category options (superadmin).
+$r->post('/projects/xero-sync', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    try {
+        $r = XeroSync::pullProjects();
+        Response::redirect('/projects?ok=' . rawurlencode("Synced from Xero \"{$r['category']}\" tracking: {$r['created']} new, {$r['updated']} updated."));
+    } catch (\Throwable $e) {
+        Response::redirect('/projects?err=' . rawurlencode('Xero sync failed: ' . $e->getMessage()));
+    }
 });
 $r->get('/projects/new', function () {
     Auth::requireRole('staff', 'purchaser', 'admin');

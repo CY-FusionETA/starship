@@ -42,7 +42,7 @@ final class PurchaseOrderRepo
     public static function lines(int $poId): array
     {
         return Db::all(
-            "SELECT pl.*, (pl.qty_ordered - pl.qty_received) AS balance_qty, c.item_code FROM po_lines pl
+            "SELECT pl.*, (pl.qty_ordered - pl.qty_received) AS balance_qty, c.item_code, c.xero_item_code FROM po_lines pl
              LEFT JOIN catalogue_items c ON c.id = pl.catalogue_item_id
              WHERE pl.purchase_order_id = ? ORDER BY pl.line_no",
             [$poId]
