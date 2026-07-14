@@ -76,17 +76,12 @@ if ($editing) {
 
 <!-- Add product modal (outside #mrForm so its fields never submit with the MR) -->
 <div class="modal-overlay" id="npOverlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="npTitle">
+  <div class="modal np-modal" role="dialog" aria-modal="true" aria-labelledby="npTitle">
     <div class="modal-h">
       <h3 id="npTitle">Add product</h3>
       <button type="button" class="modal-x" onclick="closeNewProduct()" aria-label="Close">×</button>
     </div>
     <div class="modal-b">
-      <label class="switch-row" style="margin-top:0">
-        <input type="checkbox" id="np_oneoff" onchange="toggleOneOff()">
-        <span>One-off item — this requisition only, don’t save to the catalogue</span>
-      </label>
-      <p class="muted small" id="npHint" style="margin:.1rem 0 .7rem">Saved to the catalogue and added straight to this requisition.</p>
       <div id="npErr" class="alert" hidden></div>
       <label>Product name *</label>
       <input id="np_name" placeholder="e.g. 6&quot; Victaulic Firelock Coupling" autocomplete="off">
@@ -102,6 +97,11 @@ if ($editing) {
         <div class="np-cat"><label>Category</label><input id="np_category" placeholder="Fire Alarm / Piping …"></div>
         <div><label>Ref. unit price (MYR)</label><input id="np_price" type="number" step="any" min="0" placeholder="optional"></div>
       </div>
+      <label class="switch-row" style="margin:.5rem 0 .2rem">
+        <input type="checkbox" id="np_oneoff" onchange="toggleOneOff()">
+        <span>One-off item — this requisition only, don’t save to the catalogue</span>
+      </label>
+      <p class="muted small" id="npHint" style="margin:.1rem 0 0">Saved to the catalogue and added straight to this requisition.</p>
     </div>
     <div class="modal-f">
       <button type="button" class="btn secondary" onclick="closeNewProduct()">Cancel</button>
