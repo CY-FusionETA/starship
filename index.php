@@ -512,6 +512,7 @@ $r->get('/settings', function () {
         'connected' => XeroOAuth::isConnected(),
         'configured' => XeroOAuth::isConfigured(),
         'enabled' => Settings::bool('xero.enabled'),
+        'autosync_last' => Settings::raw('xero.autosync_last'),
         'client_id' => XeroOAuth::clientId(),
         'has_secret' => XeroOAuth::clientSecret() !== '',
         'redirect_uri' => XeroOAuth::redirectUri(),

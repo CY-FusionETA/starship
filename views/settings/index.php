@@ -2,7 +2,7 @@
  * @var string $client_id @var bool $has_secret @var string $redirect_uri @var string $scopes
  * @var bool $wz_configured @var bool $wz_enabled @var string $wz_api_key @var string $wz_channel
  * @var string $wz_number @var string $wz_webhook @var array $senders
- * @var ?string $notice @var ?string $error */
+ * @var ?string $autosync_last @var ?string $notice @var ?string $error */
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
 
@@ -34,6 +34,16 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
         <div class="muted small">Organisation</div>
         <strong><?= e($token['tenant_name'] ?: 'Xero organisation') ?></strong>
         <?php if (!empty($token['expires_at'])): ?><div class="muted small">Token auto-refreshes · last updated <?= e($token['updated_at'] ?? '') ?></div><?php endif; ?>
+        <?php $as = $autosync_last ? json_decode($autosync_last, true) : null; if ($as): ?>
+          <?php $sum = $as['summary'] ?? []; $bits = [];
+            foreach (['contacts' => 'suppliers', 'projects' => 'projects', 'items' => 'products'] as $k => $lbl) {
+              if (isset($sum[$k]['error'])) { $bits[] = $lbl . ': skipped'; }
+              elseif (isset($sum[$k])) { $bits[] = $lbl . ': +' . (int)$sum[$k]['created'] . ' / ~' . (int)$sum[$k]['updated']; }
+            } ?>
+          <div class="muted small">Master data pulls from Xero every 15 min · last sync <?= e($as['at'] ?? '') ?><?= $bits ? ' (' . e(implode(', ', $bits)) . ')' : '' ?></div>
+        <?php else: ?>
+          <div class="muted small">Master data (suppliers, projects, products) pulls from Xero automatically every 15 min.</div>
+        <?php endif; ?>
       </div>
       <div class="xero-conn-actions">
         <a class="btn secondary" href="<?= e($base) ?>/settings/xero/connect">Reconnect</a>
