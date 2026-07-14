@@ -54,11 +54,10 @@ if ($editing) {
       </div>
       <div class="item-list" id="items"></div>
       <div class="add-row">
-        <button type="button" class="btn sm" onclick="openNewProduct()">＋ New product</button>
-        <button type="button" class="btn sm secondary" onclick="openOneOff()">＋ One-off (non-catalogue) item</button>
+        <button type="button" class="btn sm" onclick="openNewProduct()">＋ Add product</button>
       </div>
       <p class="muted small" style="margin:.5rem 0 0">
-        <strong>New product</strong> saves to the catalogue for everyone. <strong>One-off</strong> adds a free-text line to this requisition only.
+        Adds to the catalogue for everyone — or tick <strong>one-off</strong> in the dialog to add a free-text line to this requisition only.
       </p>
     </div>
 
@@ -75,62 +74,38 @@ if ($editing) {
   </div>
 </form>
 
-<!-- New catalogue product modal (outside #mrForm so its fields never submit with the MR) -->
+<!-- Add product modal (outside #mrForm so its fields never submit with the MR) -->
 <div class="modal-overlay" id="npOverlay" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="npTitle">
     <div class="modal-h">
-      <h3 id="npTitle">New catalogue product</h3>
+      <h3 id="npTitle">Add product</h3>
       <button type="button" class="modal-x" onclick="closeNewProduct()" aria-label="Close">×</button>
     </div>
     <div class="modal-b">
-      <p class="muted small" style="margin-top:0">Saved to the catalogue and added straight to this requisition.</p>
+      <label class="switch-row" style="margin-top:0">
+        <input type="checkbox" id="np_oneoff" onchange="toggleOneOff()">
+        <span>One-off item — this requisition only, don’t save to the catalogue</span>
+      </label>
+      <p class="muted small" id="npHint" style="margin:.1rem 0 .7rem">Saved to the catalogue and added straight to this requisition.</p>
       <div id="npErr" class="alert" hidden></div>
       <label>Product name *</label>
       <input id="np_name" placeholder="e.g. 6&quot; Victaulic Firelock Coupling" autocomplete="off">
       <div class="row">
-        <div><label>Item code</label><input id="np_code" placeholder="auto if blank"></div>
+        <div class="np-cat"><label>Item code</label><input id="np_code" placeholder="auto if blank"></div>
         <div><label>UOM</label><input id="np_uom" placeholder="nos / ft / m" value="nos"></div>
       </div>
       <div class="row">
-        <div><label>Brand</label><input id="np_brand" placeholder="Notifier / Victaulic …"></div>
-        <div><label>Model</label><input id="np_model"></div>
+        <div class="np-cat"><label>Brand</label><input id="np_brand" placeholder="Notifier / Victaulic …"></div>
+        <div class="np-cat"><label>Model</label><input id="np_model"></div>
       </div>
       <div class="row">
-        <div><label>Category</label><input id="np_category" placeholder="Fire Alarm / Piping …"></div>
+        <div class="np-cat"><label>Category</label><input id="np_category" placeholder="Fire Alarm / Piping …"></div>
         <div><label>Ref. unit price (MYR)</label><input id="np_price" type="number" step="any" min="0" placeholder="optional"></div>
       </div>
     </div>
     <div class="modal-f">
       <button type="button" class="btn secondary" onclick="closeNewProduct()">Cancel</button>
       <button type="button" class="btn" id="npSave" onclick="saveNewProduct()">Save &amp; add →</button>
-    </div>
-  </div>
-</div>
-
-<!-- One-off (non-catalogue) line modal -->
-<div class="modal-overlay" id="ooOverlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ooTitle">
-    <div class="modal-h">
-      <h3 id="ooTitle">One-off item</h3>
-      <button type="button" class="modal-x" onclick="closeOneOff()" aria-label="Close">×</button>
-    </div>
-    <div class="modal-b">
-      <p class="muted small" style="margin-top:0">Adds a free-text line to <strong>this requisition only</strong> — it is not saved to the catalogue.</p>
-      <div id="ooErr" class="alert" hidden></div>
-      <label>Description *</label>
-      <input id="oo_name" placeholder="e.g. Site-specific bracket, fabricated on order" autocomplete="off">
-      <div class="row">
-        <div><label>Quantity *</label><input id="oo_qty" type="number" step="any" min="1" value="1"></div>
-        <div><label>UOM</label><input id="oo_uom" placeholder="nos / ft / m" value="nos"></div>
-      </div>
-      <div class="row">
-        <div><label>Est. unit price (MYR)</label><input id="oo_price" type="number" step="any" min="0" placeholder="optional"></div>
-        <div></div>
-      </div>
-    </div>
-    <div class="modal-f">
-      <button type="button" class="btn secondary" onclick="closeOneOff()">Cancel</button>
-      <button type="button" class="btn" onclick="saveOneOff()">Add to requisition →</button>
     </div>
   </div>
 </div>
@@ -172,59 +147,54 @@ function addItem(it){
   if(!cart.has(key)) cart.set(key,{id:it.id,code:it.item_code,name:it.name,uom:it.uom,price:it.unit_price,qty:1,custom:false});
   renderItems(); renderCart();
 }
-// ---- One-off (non-catalogue) line ----
-const ooOverlay = document.getElementById('ooOverlay');
-function openOneOff(){
-  document.getElementById('ooErr').hidden = true;
-  document.getElementById('oo_name').value = '';
-  document.getElementById('oo_qty').value = '1';
-  document.getElementById('oo_uom').value = 'nos';
-  document.getElementById('oo_price').value = '';
-  ooOverlay.hidden = false;
-  setTimeout(()=>document.getElementById('oo_name').focus(),30);
-}
-function closeOneOff(){ ooOverlay.hidden = true; }
-ooOverlay.addEventListener('click',e=>{ if(e.target===ooOverlay) closeOneOff(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !ooOverlay.hidden) closeOneOff(); });
-function saveOneOff(){
-  const err = document.getElementById('ooErr');
-  const name = document.getElementById('oo_name').value.trim();
-  if(!name){ err.textContent='Description is required.'; err.hidden=false; document.getElementById('oo_name').focus(); return; }
-  const qty = Math.max(1, parseFloat(document.getElementById('oo_qty').value) || 1);
-  const uom = document.getElementById('oo_uom').value.trim() || 'nos';
-  const priceRaw = document.getElementById('oo_price').value.trim();
-  const price = priceRaw === '' ? null : (parseFloat(priceRaw) || 0);
-  const key='x'+(customSeq++);
-  cart.set(key,{id:null,code:'custom',name,uom,price,qty,custom:true});
-  closeOneOff();
-  renderCart();
-}
-
-// ---- New catalogue product (inline create) ----
+// ---- Add product (catalogue product, or a one-off line via the checkbox) ----
 const npOverlay = document.getElementById('npOverlay');
 function openNewProduct(){
   document.getElementById('npErr').hidden = true;
   ['name','code','brand','model','category','price'].forEach(f=>document.getElementById('np_'+f).value='');
   document.getElementById('np_uom').value='nos';
+  document.getElementById('np_oneoff').checked=false;
+  toggleOneOff();
   npOverlay.hidden = false;
   setTimeout(()=>document.getElementById('np_name').focus(),30);
 }
 function closeNewProduct(){ npOverlay.hidden = true; }
+// Ticking "one-off" dims + disables the catalogue-only fields (they aren't saved).
+function toggleOneOff(){
+  const on = document.getElementById('np_oneoff').checked;
+  document.querySelectorAll('#npOverlay .np-cat').forEach(d=>{
+    d.style.opacity = on ? .45 : '';
+    const inp = d.querySelector('input'); if(inp){ inp.disabled = on; if(on) inp.value=''; }
+  });
+  document.getElementById('npHint').innerHTML = on
+    ? 'A free-text line for <strong>this requisition only</strong> — not saved to the catalogue.'
+    : 'Saved to the catalogue and added straight to this requisition.';
+  document.getElementById('npSave').textContent = on ? 'Add one-off →' : 'Save & add →';
+}
 npOverlay.addEventListener('click',e=>{ if(e.target===npOverlay) closeNewProduct(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !npOverlay.hidden) closeNewProduct(); });
 async function saveNewProduct(){
   const name = document.getElementById('np_name').value.trim();
   const err = document.getElementById('npErr');
-  if(!name){ err.textContent='Product name is required.'; err.hidden=false; document.getElementById('np_name').focus(); return; }
+  if(!name){ err.textContent = (document.getElementById('np_oneoff').checked?'Description':'Product name')+' is required.'; err.hidden=false; document.getElementById('np_name').focus(); return; }
+  const uom = document.getElementById('np_uom').value.trim() || 'nos';
+  const priceRaw = document.getElementById('np_price').value.trim();
+  const price = priceRaw === '' ? null : (parseFloat(priceRaw) || 0);
+
+  // One-off: add a free-text line to this requisition only — no catalogue write.
+  if(document.getElementById('np_oneoff').checked){
+    cart.set('x'+(customSeq++),{id:null,code:'custom',name,uom,price,qty:1,custom:true});
+    closeNewProduct(); renderCart(); return;
+  }
+
   const btn = document.getElementById('npSave'); btn.disabled=true; btn.textContent='Saving…';
   const body = new URLSearchParams({
-    _csrf: CSRF, name,
+    _csrf: CSRF, name, uom,
     item_code: document.getElementById('np_code').value.trim(),
-    uom: document.getElementById('np_uom').value.trim(),
     brand: document.getElementById('np_brand').value.trim(),
     model: document.getElementById('np_model').value.trim(),
     category: document.getElementById('np_category').value.trim(),
-    unit_price: document.getElementById('np_price').value.trim(),
+    unit_price: priceRaw,
   });
   try{
     const r = await fetch(`${BASE}/catalogue/quick-add.json`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},body});
