@@ -37,6 +37,10 @@ a{color:var(--fe-primary-2);text-decoration:none;transition:color .15s var(--eas
 .sidebar nav a.active{font-weight:600}
 .sidebar nav a.active::before{content:"";position:absolute;left:0;top:.4rem;bottom:.4rem;width:3px;
   background:var(--fe-accent);border-radius:0 3px 3px 0}
+.sidebar nav a .nav-ico{width:19px;height:19px;flex-shrink:0;opacity:.72;
+  transition:opacity .15s var(--ease),transform .15s var(--ease)}
+.sidebar nav a:hover .nav-ico{opacity:1;transform:translateX(1px)}
+.sidebar nav a.active .nav-ico{opacity:1;color:#fff}
 .sidebar .tag{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
   color:#8fa3dd;padding:1rem 1.25rem .3rem;font-weight:600}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -196,7 +200,11 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 /* Dashboard stat grid */
 .stat-grid{grid-template-columns:repeat(3,1fr)}
 .stat{display:block}
-.stat-ic{position:absolute;right:1rem;top:.9rem;font-size:1.4rem;opacity:.18;color:var(--fe-primary)}
+.stat-ic{position:absolute;right:1rem;top:.9rem;opacity:.22;color:var(--fe-primary);line-height:0}
+.stat-ic .stat-ico{width:30px;height:30px}
+.stat.accent-pending .stat-ic{color:#F59E0B}
+.stat.accent-po .stat-ic{color:#22C55E}
+.stat.accent-cat .stat-ic{color:#8b5cf6}
 .stat.accent-req::before,.stat.accent-pending::before,.stat.accent-po::before,.stat.accent-cat::before{opacity:1}
 .stat.accent-pending::before{background:linear-gradient(180deg,#F59E0B,#f6ad3d)}
 .stat.accent-po::before{background:linear-gradient(180deg,#22C55E,#4ade80)}
@@ -296,6 +304,7 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
   .sidebar{width:64px}
   .sidebar .brand span:not(.logo),.sidebar nav a span,.sidebar .tag{display:none}
   .sidebar nav a{justify-content:center;padding:.7rem 0}
+  .sidebar nav a .nav-ico{width:22px;height:22px}
   .grid.cols-3,.stat-grid{grid-template-columns:1fr}
   .hero{padding:1.5rem 1.3rem}.hero h1{font-size:1.6rem}
   .content{padding:1.25rem 1rem}

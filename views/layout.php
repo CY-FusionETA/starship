@@ -2,6 +2,7 @@
 /** @var string $content  @var string $title */
 use App\Auth;
 use App\Router;
+use App\Icons;
 use App\Repo\RequisitionRepo;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $path = Router::path();
@@ -27,19 +28,19 @@ $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
     <div class="brand"><span class="logo">St</span> <span>Starship</span></div>
     <div class="tag">Procure</div>
     <nav>
-      <?php $nav('/', 'Dashboard', '▦'); ?>
-      <?php if ($isAdmin) $nav('/approvals', 'Approvals', '✔', $pending ?: null); ?>
-      <?php $nav('/requisitions', 'Requisitions', '▣'); ?>
-      <?php $nav('/purchase-orders', 'Purchase Orders', '▤'); ?>
-      <?php $nav('/delivery-orders', 'Delivery Orders', '⇩'); ?>
+      <?php $nav('/', 'Dashboard', Icons::svg('dashboard')); ?>
+      <?php if ($isAdmin) $nav('/approvals', 'Approvals', Icons::svg('approvals'), $pending ?: null); ?>
+      <?php $nav('/requisitions', 'Requisitions', Icons::svg('requisitions')); ?>
+      <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
+      <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
       <div class="tag">Master data</div>
-      <?php $nav('/catalogue', 'Catalogue', '▥'); ?>
-      <?php $nav('/suppliers', 'Suppliers', '◫'); ?>
-      <?php $nav('/projects', 'Projects', '◈'); ?>
-      <?php $nav('/aliases', 'Supplier aliases', '⇄'); ?>
+      <?php $nav('/catalogue', 'Catalogue', Icons::svg('catalogue')); ?>
+      <?php $nav('/suppliers', 'Suppliers', Icons::svg('suppliers')); ?>
+      <?php $nav('/projects', 'Projects', Icons::svg('projects')); ?>
+      <?php $nav('/aliases', 'Supplier aliases', Icons::svg('aliases')); ?>
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
-        <?php $nav('/settings', 'Settings', '⚙'); ?>
+        <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>
       <?php endif; ?>
     </nav>
   </aside>

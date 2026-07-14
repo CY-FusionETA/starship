@@ -43,27 +43,27 @@ $statusBadge = function (string $s): string {
 
 <div class="grid stat-grid">
   <a class="stat accent-req" href="<?= e($base) ?>/requisitions">
-    <div class="stat-ic">▣</div>
+    <div class="stat-ic"><?= App\Icons::svg('requisitions','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['requisitions'] ?></div><div class="lbl">Requisitions</div>
   </a>
   <a class="stat accent-pending" href="<?= e($base) ?>/<?= $isAdmin ? 'approvals' : 'requisitions' ?>">
-    <div class="stat-ic">⏳</div>
+    <div class="stat-ic"><?= App\Icons::svg('pending','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['pending'] ?></div><div class="lbl">Pending approval</div>
   </a>
   <a class="stat accent-po" href="<?= e($base) ?>/purchase-orders">
-    <div class="stat-ic">▤</div>
+    <div class="stat-ic"><?= App\Icons::svg('po','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['pos'] ?></div><div class="lbl">Purchase orders</div>
   </a>
   <a class="stat accent-cat" href="<?= e($base) ?>/catalogue">
-    <div class="stat-ic">▥</div>
+    <div class="stat-ic"><?= App\Icons::svg('catalogue','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['catalogue'] ?></div><div class="lbl">Catalogue items</div>
   </a>
   <a class="stat" href="<?= e($base) ?>/suppliers">
-    <div class="stat-ic">◫</div>
+    <div class="stat-ic"><?= App\Icons::svg('suppliers','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['suppliers'] ?></div><div class="lbl">Suppliers</div>
   </a>
   <a class="stat" href="<?= e($base) ?>/projects">
-    <div class="stat-ic">◈</div>
+    <div class="stat-ic"><?= App\Icons::svg('projects','stat-ico') ?></div>
     <div class="num"><?= (int)$stats['projects'] ?></div><div class="lbl">Projects / sites</div>
   </a>
 </div>
