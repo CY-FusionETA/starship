@@ -57,6 +57,68 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
     <tfoot><tr><th colspan="6" style="text-align:right">Total (MYR)</th><th><?= number_format($tot,2) ?></th><th></th></tr></tfoot>
   </table>
 </div>
+
+<?php
+$fmtq = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+$doBadge = fn($s) => '<span class="badge ' . (['received'=>'muted','ocr_done'=>'brand','needs_review'=>'warn','confirmed'=>'brand','matched'=>'ok','exception'=>'danger'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>';
+$pct = $fulfil['ordered'] > 0 ? (int)min(100, round($fulfil['received'] / $fulfil['ordered'] * 100)) : 0;
+$fullyDone = $fulfil['outstanding'] <= 1e-6 && $fulfil['ordered'] > 0;
+?>
+<div class="card">
+  <div class="dash-sec-h" style="margin-bottom:.7rem">
+    <h2 style="margin:0;font-size:1.05rem">📦 Deliveries &amp; invoices</h2>
+    <span class="muted small"><?= count($dos) ?> DO<?= count($dos) == 1 ? '' : 's' ?> · <?= count($bills) ?> invoice<?= count($bills) == 1 ? '' : 's' ?></span>
+  </div>
+
+  <div class="po-fulfil">
+    <div><span class="fu-num"><?= $fmtq($fulfil['ordered']) ?></span><span class="fu-lbl">Ordered</span></div>
+    <div><span class="fu-num ok"><?= $fmtq($fulfil['received']) ?></span><span class="fu-lbl">Received</span></div>
+    <div><span class="fu-num <?= $fulfil['outstanding'] > 1e-6 ? 'warn' : '' ?>"><?= $fmtq($fulfil['outstanding']) ?></span><span class="fu-lbl">Outstanding</span></div>
+    <div><span class="fu-num"><?= (int)$fulfil['open_lines'] ?>/<?= (int)$fulfil['lines'] ?></span><span class="fu-lbl">Lines not delivered</span></div>
+  </div>
+  <div class="po-bar"><span style="width:<?= $pct ?>%"></span></div>
+  <p class="muted small" style="margin:.35rem 0 0"><?= $pct ?>% delivered<?= $fullyDone ? ' · fully received ✅' : ($fulfil['outstanding'] > 1e-6 ? ' · ' . $fmtq($fulfil['outstanding']) . ' still on backorder' : '') ?></p>
+
+  <?php if ($dos): ?>
+  <table style="margin-top:1.1rem">
+    <thead><tr><th>DO No.</th><th>Date</th><th>Qty received</th><th>Lines</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($dos as $d): ?>
+      <tr>
+        <td><strong><?= e($d['do_number'] ?: ('#' . $d['id'])) ?></strong></td>
+        <td><?= e($d['delivery_date'] ?: '—') ?></td>
+        <td><?= $fmtq($d['qty_received']) ?></td>
+        <td><?= (int)$d['line_count'] ?></td>
+        <td><?= $doBadge($d['status']) ?></td>
+        <td style="text-align:right"><a class="btn sm secondary" href="<?= e($base) ?>/delivery-orders/<?= (int)$d['id'] ?>">Open →</a></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?>
+    <p class="muted small" style="margin:.9rem 0 0">No delivery orders booked against this PO yet.</p>
+  <?php endif; ?>
+
+  <h3 style="margin:1.3rem 0 .4rem;font-size:.98rem">🧾 Invoices</h3>
+  <?php if ($bills): ?>
+  <table>
+    <thead><tr><th>Invoice</th><th>Date</th><th>Total (MYR)</th><th>Status</th></tr></thead>
+    <tbody>
+    <?php foreach ($bills as $b): ?>
+      <tr>
+        <td><strong><?= e($b['invoice_number'] ?: ('#' . $b['id'])) ?></strong></td>
+        <td><?= e($b['invoice_date'] ?: '—') ?></td>
+        <td><?= $b['total_amount'] !== null ? number_format((float)$b['total_amount'], 2) : '—' ?></td>
+        <td><span class="badge muted"><?= e($b['status']) ?></span></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?>
+    <p class="muted small" style="margin:0">No invoices recorded against this PO yet — invoice capture is a later phase.</p>
+  <?php endif; ?>
+</div>
+
 <?php if (Auth::isAdmin()): ?>
 <div class="card">
   <details>

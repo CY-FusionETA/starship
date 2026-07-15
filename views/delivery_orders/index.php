@@ -16,7 +16,7 @@ $sb = fn($s) => '<span class="badge ' . (['received'=>'muted','ocr_done'=>'brand
       <tr>
         <td><strong><?= e($d['do_number'] ?: '—') ?></strong></td>
         <td><?= e($d['supplier_name'] ?: '—') ?></td>
-        <td><?= $d['po_number'] ? '<span class="badge brand">'.e($d['po_number']).'</span>' : '<span class="muted">—</span>' ?></td>
+        <td><?= $d['po_number'] ? '<a href="'.e($base).'/purchase-orders/'.(int)$d['purchase_order_id'].'"><span class="badge brand">'.e($d['po_number']).'</span></a>' : '<span class="muted">—</span>' ?></td>
         <td><?= e($d['delivery_date'] ?: '—') ?></td>
         <td class="small muted"><?= e($d['match_summary'] ?: '—') ?></td>
         <td><?= $sb($d['status']) ?></td>

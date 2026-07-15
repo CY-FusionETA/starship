@@ -84,6 +84,53 @@ final class PurchaseOrderRepo
         return Db::one("SELECT * FROM po_lines WHERE id = ?", [$id]);
     }
 
+    /** Fulfilment totals for a PO: ordered / received / outstanding across all lines. */
+    public static function fulfilment(int $poId): array
+    {
+        $row = Db::one(
+            "SELECT COALESCE(SUM(qty_ordered),0)                        AS ordered,
+                    COALESCE(SUM(qty_received),0)                       AS received,
+                    COALESCE(SUM(MAX(qty_ordered - qty_received, 0)),0) AS outstanding,
+                    COUNT(*)                                            AS lines,
+                    COALESCE(SUM(CASE WHEN qty_received + 1e-6 < qty_ordered THEN 1 ELSE 0 END),0) AS open_lines
+             FROM po_lines WHERE purchase_order_id = ?",
+            [$poId]
+        ) ?: [];
+        return [
+            'ordered'     => (float)($row['ordered'] ?? 0),
+            'received'    => (float)($row['received'] ?? 0),
+            'outstanding' => (float)($row['outstanding'] ?? 0),
+            'lines'       => (int)($row['lines'] ?? 0),
+            'open_lines'  => (int)($row['open_lines'] ?? 0),
+        ];
+    }
+
+    /** All delivery orders booked against this PO (newest first), with received totals. */
+    public static function relatedDeliveryOrders(int $poId): array
+    {
+        return Db::all(
+            "SELECT d.id, d.do_number, d.delivery_date, d.status, d.created_at,
+                    (SELECT COALESCE(SUM(dl.qty_accepted),0) FROM do_lines dl
+                       WHERE dl.delivery_order_id = d.id AND dl.is_confirmed = 1 AND dl.matched_po_line_id IS NOT NULL) AS qty_received,
+                    (SELECT COUNT(*) FROM do_lines dl WHERE dl.delivery_order_id = d.id) AS line_count
+             FROM delivery_orders d
+             WHERE d.purchase_order_id = ?
+             ORDER BY d.created_at DESC",
+            [$poId]
+        );
+    }
+
+    /** Invoices/bills booked against this PO. Empty until the billing flow lands. */
+    public static function relatedBills(int $poId): array
+    {
+        return Db::all(
+            "SELECT b.id, b.invoice_number, b.invoice_date, b.total_amount, b.status
+             FROM bills b WHERE b.purchase_order_id = ?
+             ORDER BY b.created_at DESC",
+            [$poId]
+        );
+    }
+
     /** Recompute a PO's header status from its line statuses. */
     public static function recomputeStatus(int $poId): void
     {

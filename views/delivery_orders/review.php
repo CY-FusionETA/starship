@@ -17,13 +17,16 @@ $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','excepti
     <h1 style="margin:0">Delivery Order <?= e($do['do_number'] ?: ('#' . $do['id'])) ?></h1>
     <span class="muted small">
       <?= e($do['supplier_name'] ?: 'supplier unresolved') ?>
-      <?php if ($do['po_number']): ?> · matched to <span class="badge brand"><?= e($do['po_number']) ?></span><?php else: ?> · <span class="badge danger">no PO resolved</span><?php endif; ?>
+      <?php if ($hasPo): ?> · matched to <a href="<?= e($base) ?>/purchase-orders/<?= (int)$do['purchase_order_id'] ?>"><span class="badge brand"><?= e($do['po_number']) ?></span></a><?php else: ?> · <span class="badge danger">no PO resolved</span><?php endif; ?>
       <?php if ($do['project_code']): ?> · <span class="badge brand"><?= e($do['project_code']) ?></span><?php endif; ?>
       <?= $do['signature_present'] !== null ? ((int)$do['signature_present'] === 1 ? ' · ✅ signed' : ' · ⚠️ no signature') : '' ?>
     </span>
   </div>
   <div style="text-align:right">
     <span class="badge <?= $dostatus ?>" style="font-size:.8rem"><?= e(str_replace('_',' ',$do['status'])) ?></span>
+    <?php if ($hasPo): ?>
+      <div style="margin-top:.4rem"><a class="btn sm secondary" href="<?= e($base) ?>/purchase-orders/<?= (int)$do['purchase_order_id'] ?>">View PO <?= e($do['po_number']) ?> →</a></div>
+    <?php endif; ?>
     <?php if (!empty($do['ocr_model'])): ?>
       <div class="muted small" style="margin-top:.3rem">🤖 AI-read · <?= e($do['ocr_model']) ?> · <?= e(rtrim(rtrim(number_format((float)$do['ocr_confidence'],1),'0'),'.')) ?>% confidence</div>
     <?php endif; ?>
@@ -31,6 +34,45 @@ $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','excepti
 </div>
 
 <?php if ($do['match_summary']): ?><div class="card" style="background:#f0fdf4;border-color:#bbf7d0"><strong><?= e($do['match_summary']) ?></strong></div><?php endif; ?>
+
+<?php if ($hasPo && $poFulfil): ?>
+<?php
+$fmtq = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+$pct  = $poFulfil['ordered'] > 0 ? (int)min(100, round($poFulfil['received'] / $poFulfil['ordered'] * 100)) : 0;
+$plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'=>'warn','fully_received'=>'ok','over_received'=>'warn','closed'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>';
+?>
+<div class="card">
+  <div class="dash-sec-h" style="margin-bottom:.7rem">
+    <h3 style="margin:0">📦 PO <?= e($do['po_number']) ?> — what's still outstanding</h3>
+    <a class="small" href="<?= e($base) ?>/purchase-orders/<?= (int)$do['purchase_order_id'] ?>">Open PO →</a>
+  </div>
+  <div class="po-fulfil">
+    <div><span class="fu-num"><?= $fmtq($poFulfil['ordered']) ?></span><span class="fu-lbl">Ordered</span></div>
+    <div><span class="fu-num ok"><?= $fmtq($poFulfil['received']) ?></span><span class="fu-lbl">Received</span></div>
+    <div><span class="fu-num <?= $poFulfil['outstanding'] > 1e-6 ? 'warn' : '' ?>"><?= $fmtq($poFulfil['outstanding']) ?></span><span class="fu-lbl">Still outstanding</span></div>
+    <div><span class="fu-num"><?= (int)$poFulfil['open_lines'] ?>/<?= (int)$poFulfil['lines'] ?></span><span class="fu-lbl">Lines not delivered</span></div>
+  </div>
+  <div class="po-bar"><span style="width:<?= $pct ?>%"></span></div>
+  <?php if (!empty($poAllLines)): ?>
+  <table style="margin-top:1rem">
+    <thead><tr><th>#</th><th>PO line</th><th>Ordered</th><th>Received</th><th>Outstanding</th><th>Status</th></tr></thead>
+    <tbody>
+    <?php foreach ($poAllLines as $pl): $bal = (float)$pl['balance_qty']; ?>
+      <tr>
+        <td><?= (int)$pl['line_no'] ?></td>
+        <td><?= e($pl['description']) ?></td>
+        <td><?= $fmtq($pl['qty_ordered']) ?> <?= e($pl['uom']) ?></td>
+        <td><?= $fmtq($pl['qty_received']) ?></td>
+        <td><?= $bal > 1e-6 ? '<strong>' . $fmtq($bal) . '</strong>' : '0' ?></td>
+        <td><?= $plsb($pl['line_status']) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+  <p class="muted small" style="margin:.45rem 0 0"><?= $pct ?>% of this PO delivered across all DOs<?= $poFulfil['outstanding'] > 1e-6 ? ' · ' . $fmtq($poFulfil['outstanding']) . ' still to come' : ' · fully received ✅' ?></p>
+</div>
+<?php endif; ?>
 
 <div class="rq-grid">
   <!-- image + confirm -->

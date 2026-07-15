@@ -352,7 +352,15 @@ $r->get('/purchase-orders/{id}', function ($p) {
     Auth::require();
     $po = PurchaseOrderRepo::find((int)$p['id']);
     if (!$po) Response::notFound();
-    Response::view('purchase_orders/show', ['po' => $po, 'lines' => PurchaseOrderRepo::lines((int)$p['id']), 'error' => $_GET['err'] ?? null], 'PO ' . $po['po_number']);
+    $pid = (int)$p['id'];
+    Response::view('purchase_orders/show', [
+        'po'     => $po,
+        'lines'  => PurchaseOrderRepo::lines($pid),
+        'fulfil' => PurchaseOrderRepo::fulfilment($pid),
+        'dos'    => PurchaseOrderRepo::relatedDeliveryOrders($pid),
+        'bills'  => PurchaseOrderRepo::relatedBills($pid),
+        'error'  => $_GET['err'] ?? null,
+    ], 'PO ' . $po['po_number']);
 });
 // Manual Xero push / retry (superadmin) — for POs raised while Xero was down or disconnected.
 $r->post('/purchase-orders/{id}/xero-sync', function ($p) {
@@ -467,12 +475,15 @@ $r->get('/delivery-orders/{id}', function ($p) {
     Auth::require();
     $do = DeliveryOrderRepo::find((int)$p['id']);
     if (!$do) Response::notFound();
-    $poLines = !empty($do['purchase_order_id']) ? PurchaseOrderRepo::openLines((int)$do['purchase_order_id']) : [];
+    $poId = (int)($do['purchase_order_id'] ?? 0);
+    $poLines = $poId ? PurchaseOrderRepo::openLines($poId) : [];
     Response::view('delivery_orders/review', [
-        'do'      => $do,
-        'lines'   => DeliveryOrderRepo::lines((int)$p['id']),
-        'poLines' => $poLines,
-        'openPos' => PurchaseOrderRepo::openForSelect(),
+        'do'         => $do,
+        'lines'      => DeliveryOrderRepo::lines((int)$p['id']),
+        'poLines'    => $poLines,
+        'poAllLines' => $poId ? PurchaseOrderRepo::lines($poId) : [],
+        'poFulfil'   => $poId ? PurchaseOrderRepo::fulfilment($poId) : null,
+        'openPos'    => PurchaseOrderRepo::openForSelect(),
     ], 'DO ' . ($do['do_number'] ?: $p['id']));
 });
 $r->post('/delivery-orders/{id}/relink', function ($p) {
