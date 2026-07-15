@@ -13,8 +13,10 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
   <div>
     <h1 style="margin:0">MR <?= e($req['mr_number']) ?></h1>
     <span class="muted small"><span class="badge brand"><?= e($req['project_code']) ?></span> <?= e($req['project_name']) ?>
-      · requested by <?= e($req['requested_by'] ?: '—') ?> · <?= e($req['request_date'] ?: '') ?>
-      · delivery <?= e($req['delivery_date'] ?: '—') ?></span>
+      · requested by <?= e($req['requested_by'] ?: '—') ?><?php if (!empty($req['requester_mobile'])): ?> · 📱 <?= e($req['requester_mobile']) ?><?php endif; ?><?php if (!empty($req['requester_email'])): ?> · ✉️ <?= e($req['requester_email']) ?><?php endif; ?>
+      · submitted <?= e($req['request_date'] ?: '—') ?>
+      <?php if (!empty($req['urgency'])): ?> · <span class="badge <?= str_starts_with((string)$req['urgency'], 'ASAP') ? 'danger' : 'warn' ?>"><?= e($req['urgency']) ?></span><?php endif; ?>
+      <?php if (!empty($req['delivery_date'])): ?> · delivery <?= e($req['delivery_date']) ?><?php endif; ?></span>
   </div>
   <div>
     <span class="badge <?= ['draft'=>'muted','approved'=>'brand','partially_ordered'=>'warn','fully_ordered'=>'ok'][$req['status']] ?? 'muted' ?>" style="font-size:.8rem"><?= e(str_replace('_',' ',$req['status'])) ?></span>

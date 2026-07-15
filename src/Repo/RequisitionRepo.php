@@ -92,14 +92,17 @@ final class RequisitionRepo
     {
         return Db::tx(function () use ($header, $lines) {
             $reqId = Db::insert('requisitions', [
-                'mr_number'     => trim($header['mr_number']),
-                'project_id'    => (int)$header['project_id'],
-                'requested_by'  => trim($header['requested_by'] ?? '') ?: null,
-                'request_date'  => ($header['request_date'] ?? '') ?: null,
-                'delivery_date' => trim($header['delivery_date'] ?? '') ?: null,
-                'notes'         => trim($header['notes'] ?? '') ?: null,
-                'status'        => 'draft',
-                'created_by'    => Auth::id(),
+                'mr_number'        => trim($header['mr_number']),
+                'project_id'       => (int)$header['project_id'],
+                'requested_by'     => trim($header['requested_by'] ?? '') ?: null,
+                'requester_mobile' => trim($header['requester_mobile'] ?? '') ?: null,
+                'requester_email'  => trim($header['requester_email'] ?? '') ?: null,
+                'request_date'     => ($header['request_date'] ?? '') ?: null,
+                'delivery_date'    => trim($header['delivery_date'] ?? '') ?: null,
+                'urgency'          => trim($header['urgency'] ?? '') ?: null,
+                'notes'            => trim($header['notes'] ?? '') ?: null,
+                'status'           => 'draft',
+                'created_by'       => Auth::id(),
             ]);
             $no = 0;
             foreach ($lines as $l) {
@@ -136,12 +139,15 @@ final class RequisitionRepo
     {
         Db::tx(function () use ($id, $header, $lines) {
             Db::update('requisitions', $id, [
-                'mr_number'     => trim($header['mr_number']),
-                'project_id'    => (int)$header['project_id'],
-                'requested_by'  => trim($header['requested_by'] ?? '') ?: null,
-                'request_date'  => ($header['request_date'] ?? '') ?: null,
-                'delivery_date' => trim($header['delivery_date'] ?? '') ?: null,
-                'notes'         => trim($header['notes'] ?? '') ?: null,
+                'mr_number'        => trim($header['mr_number']),
+                'project_id'       => (int)$header['project_id'],
+                'requested_by'     => trim($header['requested_by'] ?? '') ?: null,
+                'requester_mobile' => trim($header['requester_mobile'] ?? '') ?: null,
+                'requester_email'  => trim($header['requester_email'] ?? '') ?: null,
+                'request_date'     => ($header['request_date'] ?? '') ?: null,
+                'delivery_date'    => trim($header['delivery_date'] ?? '') ?: null,
+                'urgency'          => trim($header['urgency'] ?? '') ?: null,
+                'notes'            => trim($header['notes'] ?? '') ?: null,
             ]);
             Db::q("DELETE FROM requisition_lines WHERE requisition_id = ?", [$id]);
             $no = 0;
