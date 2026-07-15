@@ -273,10 +273,10 @@ function syncUrgency(){
   d.disabled = !specify;
   if(!specify) d.value = '';
 }
-// Grey out the text of any select still on its empty placeholder option.
-document.querySelectorAll('.mr-fields select').forEach(sel=>{
-  const ph = () => sel.classList.toggle('is-placeholder', sel.value === '');
-  sel.addEventListener('change', ph); ph();
+// Grey out empty selects (placeholder option) and empty date inputs (dd/mm/yyyy).
+document.querySelectorAll('.mr-fields select, .mr-fields input[type=date]').forEach(el=>{
+  const ph = () => el.classList.toggle('is-placeholder', el.value === '');
+  el.addEventListener('change', ph); el.addEventListener('input', ph); ph();
 });
 renderCart();
 load('');
