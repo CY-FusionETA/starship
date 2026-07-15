@@ -12,6 +12,7 @@ $nav = function (string $href, string $label, string $icon, ?int $badge = null) 
     echo '<a class="' . $active . '" href="' . e($base . $href) . '">' . $icon . ' <span>' . e($label) . '</span>' . $b . '</a>';
 };
 $isAdmin = Auth::isAdmin();
+$isRequester = Auth::role() === 'requester';
 $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
 ?><!DOCTYPE html>
 <html lang="en">
@@ -31,8 +32,10 @@ $pending = $isAdmin ? RequisitionRepo::pendingCount() : 0;
       <?php $nav('/', 'Dashboard', Icons::svg('dashboard')); ?>
       <?php if ($isAdmin) $nav('/approvals', 'Approvals', Icons::svg('approvals'), $pending ?: null); ?>
       <?php $nav('/requisitions', 'Requisitions', Icons::svg('requisitions')); ?>
+      <?php if (!$isRequester): ?>
       <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
       <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
+      <?php endif; ?>
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
         <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>

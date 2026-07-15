@@ -257,11 +257,11 @@ $r->get('/requisitions', function () {
     Response::view('requisitions/index', ['requisitions' => RequisitionRepo::all()], 'Requisitions');
 });
 $r->get('/requisitions/new', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
     Response::view('requisitions/form', ['projects' => ProjectRepo::all(), 'catalogue' => CatalogueRepo::all()], 'New requisition');
 });
 $r->post('/requisitions/save', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
     Csrf::check();
     $id = RequisitionRepo::create($_POST, $_POST['lines'] ?? []);
     Response::redirect('/requisitions/' . $id);
@@ -315,7 +315,7 @@ $r->post('/requisitions/{id}/create-po', function ($p) {
     Response::redirect('/purchase-orders/' . $poId);
 });
 $r->get('/requisitions/{id}/edit', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
     $req = RequisitionRepo::find((int)$p['id']);
     if (!$req) Response::notFound();
     if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . (int)$p['id'] . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
@@ -327,7 +327,7 @@ $r->get('/requisitions/{id}/edit', function ($p) {
     ], 'Edit MR ' . $req['mr_number']);
 });
 $r->post('/requisitions/{id}/update', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
     Csrf::check();
     $id = (int)$p['id'];
     $req = RequisitionRepo::find($id);
