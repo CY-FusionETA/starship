@@ -91,18 +91,22 @@ input:hover,select:hover,textarea:hover{border-color:#c7d2e0}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--fe-primary-2);
   box-shadow:0 0 0 3px rgba(45,77,179,.14)}
 .row{display:flex;gap:1rem;flex-wrap:wrap}.row>div{flex:1;min-width:180px}
-.btn{display:inline-flex;align-items:center;gap:.4rem;background:var(--fe-accent);color:#fff;border:none;cursor:pointer;
-  padding:.6rem 1.4rem;border-radius:var(--radius-btn);font-weight:600;font-size:.95rem;
+/* All variants share ONE box model: same padding + a 1.5px border (transparent
+   on filled buttons) so a primary, secondary or ghost button are pixel-identical
+   in height. Only .sm changes the size — uniformly across every variant. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;background:var(--fe-accent);color:#fff;
+  border:1.5px solid transparent;cursor:pointer;
+  padding:.55rem 1.3rem;border-radius:var(--radius-btn);font-weight:600;font-size:.9rem;line-height:1.2;
   box-shadow:0 2px 6px rgba(255,107,53,.25);
-  transition:transform .12s var(--ease),box-shadow .15s var(--ease),filter .15s var(--ease)}
+  transition:transform .12s var(--ease),box-shadow .15s var(--ease),filter .15s var(--ease),background .15s var(--ease),border-color .15s var(--ease)}
 .btn:hover{filter:brightness(1.04);text-decoration:none;color:#fff;box-shadow:0 4px 12px rgba(255,107,53,.32);transform:translateY(-1px)}
 .btn:active{transform:translateY(0);box-shadow:0 1px 3px rgba(255,107,53,.3)}
 .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,107,53,.35)}
 .btn:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.2);box-shadow:none;transform:none}
-.btn.secondary{background:#fff;color:var(--fe-primary);border:1.5px solid #c7d2e6;padding:.5rem 1.3rem;box-shadow:none}
+.btn.secondary{background:#fff;color:var(--fe-primary);border-color:#c7d2e6;box-shadow:none}
 .btn.secondary:hover{background:#f7f9ff;border-color:var(--fe-primary-2);color:var(--fe-primary-2);filter:none}
 .btn.secondary:active{background:#eef2ff}
-.btn.sm{padding:.35rem .85rem;font-size:.85rem}
+.btn.sm{padding:.4rem .85rem;font-size:.82rem}
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.1rem;flex-wrap:wrap}
 .search{flex:1;max-width:420px;position:relative}
 .search input{padding-left:2.1rem}
@@ -297,9 +301,9 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .empty-emoji{font-size:2.6rem;color:var(--fe-success);margin-bottom:.3rem}
 
 /* Buttons: ghost danger */
-.btn.ghost{background:#fff;color:var(--fe-muted);border:1.5px solid var(--fe-border);box-shadow:none;padding:.32rem .8rem}
+.btn.ghost{background:#fff;color:var(--fe-muted);border-color:var(--fe-border);box-shadow:none}
 .btn.ghost:hover{background:#f7f9ff;border-color:#c7d2e6;color:var(--fe-primary);filter:none;box-shadow:none}
-.btn.ghost-danger{background:#fff;color:var(--fe-danger);border:1.5px solid #fecaca;box-shadow:none;padding:.32rem .8rem}
+.btn.ghost-danger{background:#fff;color:var(--fe-danger);border-color:#fecaca;box-shadow:none}
 .btn.ghost-danger:hover{background:#fef2f2;border-color:var(--fe-danger);color:#b91c1c;filter:none;box-shadow:none}
 .row-actions{display:flex;gap:.4rem;white-space:nowrap}
 
