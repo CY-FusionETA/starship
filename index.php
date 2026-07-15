@@ -18,6 +18,7 @@ use App\Repo\SupplierRepo;
 use App\Repo\ProjectRepo;
 use App\Repo\AliasRepo;
 use App\Repo\RequisitionRepo;
+use App\Repo\DashboardRepo;
 use App\Repo\PurchaseOrderRepo;
 use App\Repo\DeliveryOrderRepo;
 use App\Service\MatchingService;
@@ -55,17 +56,15 @@ $r->get('/logout', function () { Auth::logout(); Response::redirect('/login'); }
 // --- Dashboard ------------------------------------------------------
 $r->get('/', function () {
     Auth::require();
+    $uid = (int)(Auth::id() ?? 0);
+    $isAdmin = Auth::isAdmin();
     Response::view('dashboard', [
-        'stats' => [
-            'catalogue'    => CatalogueRepo::count(),
-            'suppliers'    => count(SupplierRepo::all()),
-            'projects'     => count(ProjectRepo::all()),
-            'requisitions' => RequisitionRepo::count(),
-            'pending'      => RequisitionRepo::pendingCount(),
-            'pos'          => PurchaseOrderRepo::count(),
-        ],
-        'pendingReqs' => Auth::isAdmin() ? RequisitionRepo::pending(5) : [],
-        'recentReqs'  => RequisitionRepo::recent(6),
+        'kpis'     => DashboardRepo::kpis($uid),
+        'pending'  => DashboardRepo::pendingApprovals(8),
+        'ready'    => DashboardRepo::readyToOrder(8),
+        'upcoming' => DashboardRepo::upcomingDeliveries(8),
+        'overdue'  => DashboardRepo::overdue(8),
+        'mine'     => $isAdmin ? [] : DashboardRepo::myOpen($uid, 8),
     ], 'Dashboard');
 });
 
