@@ -265,14 +265,19 @@ function fmt(n){ return (Math.round(n*100)/100).toLocaleString('en-MY',{minimumF
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 // The delivery-date picker only applies when urgency is "Specify Date Below".
+// Only the date input itself is disabled — the row titles stay full-black.
 function syncUrgency(){
   const u = document.getElementById('urgency').value;
   const d = document.getElementById('deliveryDate');
   const specify = (u === 'Specify Date Below');
   d.disabled = !specify;
-  d.closest('.row').style.opacity = specify ? '' : .5;
   if(!specify) d.value = '';
 }
+// Grey out the text of any select still on its empty placeholder option.
+document.querySelectorAll('.mr-fields select').forEach(sel=>{
+  const ph = () => sel.classList.toggle('is-placeholder', sel.value === '');
+  sel.addEventListener('change', ph); ph();
+});
 renderCart();
 load('');
 syncUrgency();
