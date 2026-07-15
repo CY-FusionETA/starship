@@ -52,7 +52,7 @@ if ($editing) {
             <?php endforeach; ?>
           </select>
         </div>
-        <div><label>Specific Delivery Date</label><input name="delivery_date" id="deliveryDate" type="date" value="<?= $editing ? e($req['delivery_date']) : '' ?>"></div>
+        <div id="deliveryDateField" hidden><label>Specific Delivery Date</label><input name="delivery_date" id="deliveryDate" type="date" value="<?= $editing ? e($req['delivery_date']) : '' ?>"></div>
       </div>
     </div>
   </div>
@@ -264,12 +264,12 @@ function chip(v){ document.getElementById('q').value=v; load(v); }
 function fmt(n){ return (Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-// The delivery-date picker only applies when urgency is "Specify Date Below".
-// Only the date input itself is disabled — the row titles stay full-black.
+// The delivery-date picker only shows when urgency is "Specify Date Below".
 function syncUrgency(){
   const u = document.getElementById('urgency').value;
   const d = document.getElementById('deliveryDate');
   const specify = (u === 'Specify Date Below');
+  document.getElementById('deliveryDateField').hidden = !specify;
   d.disabled = !specify;
   if(!specify) d.value = '';
 }
