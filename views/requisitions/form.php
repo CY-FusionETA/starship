@@ -26,30 +26,34 @@ if ($editing) {
 <form id="mrForm" method="post" action="<?= e($base . $action) ?>">
   <?= Csrf::field() ?>
   <div class="card">
-    <div class="rq-head">
-      <div class="row"><label>MR No. *</label><input name="mr_number" required placeholder="48" value="<?= $editing ? e($req['mr_number']) : '' ?>"></div>
-      <div class="row"><label>Project *</label>
-        <select name="project_id" id="projectSelect" required onchange="syncProject()">
-          <option value="">— select —</option>
-          <?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>" data-code="<?= e($p['project_code']) ?>" data-title="<?= e($p['name']) ?>" <?= ($editing && (int)$req['project_id'] === (int)$p['id']) ? 'selected' : '' ?>><?= e($p['project_code']) ?> — <?= e($p['name']) ?></option><?php endforeach; ?>
-        </select>
+    <div class="mr-fields">
+      <div class="row">
+        <div style="flex:0 1 150px;min-width:120px"><label>MR No. *</label><input name="mr_number" required placeholder="48" value="<?= $editing ? e($req['mr_number']) : '' ?>"></div>
+        <div style="flex:3"><label>Project *</label>
+          <select name="project_id" required>
+            <option value="">— select project —</option>
+            <?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>" <?= ($editing && (int)$req['project_id'] === (int)$p['id']) ? 'selected' : '' ?>><?= e($p['project_code']) ?> — <?= e($p['name']) ?></option><?php endforeach; ?>
+          </select>
+        </div>
       </div>
-      <div class="row"><label>Project Title</label><input id="projTitle" readonly placeholder="— from project —" value="<?= $editing ? e($req['project_name'] ?? '') : '' ?>"></div>
-      <div class="row"><label>Project Code</label><input id="projCode" readonly placeholder="— from project —" value="<?= $editing ? e($req['project_code'] ?? '') : '' ?>"></div>
-      <div class="row"><label>Submission Date</label><input name="request_date" type="date" value="<?= $editing ? e($req['request_date']) : '' ?>"></div>
-      <div class="row"><label>Urgency</label>
-        <?php $urg = $editing ? ($req['urgency'] ?? '') : ''; ?>
-        <select name="urgency" id="urgency" onchange="syncUrgency()">
-          <option value="">— select —</option>
-          <?php foreach (['ASAP/URGENT','ASAP - Partial Delivery Accepted','Specify Date Below','TBA - To Be Advised'] as $opt): ?>
-            <option value="<?= e($opt) ?>" <?= $urg === $opt ? 'selected' : '' ?>><?= e($opt) ?></option>
-          <?php endforeach; ?>
-        </select>
+      <div class="row">
+        <div><label>Requested by</label><input name="requested_by" placeholder="ARASH" value="<?= $editing ? e($req['requested_by']) : '' ?>"></div>
+        <div><label>Mobile Number</label><input name="requester_mobile" type="tel" placeholder="+60 12-345 6789" value="<?= $editing ? e($req['requester_mobile'] ?? '') : '' ?>"></div>
+        <div><label>Email</label><input name="requester_email" type="email" placeholder="name@company.com" value="<?= $editing ? e($req['requester_email'] ?? '') : '' ?>"></div>
       </div>
-      <div class="row"><label>Specific Delivery Date</label><input name="delivery_date" id="deliveryDate" type="date" value="<?= $editing ? e($req['delivery_date']) : '' ?>"></div>
-      <div class="row"><label>Requested by</label><input name="requested_by" placeholder="ARASH" value="<?= $editing ? e($req['requested_by']) : '' ?>"></div>
-      <div class="row"><label>Mobile Number</label><input name="requester_mobile" type="tel" placeholder="+60 12-345 6789" value="<?= $editing ? e($req['requester_mobile'] ?? '') : '' ?>"></div>
-      <div class="row"><label>Email</label><input name="requester_email" type="email" placeholder="name@company.com" value="<?= $editing ? e($req['requester_email'] ?? '') : '' ?>"></div>
+      <div class="row">
+        <div><label>Submission Date</label><input name="request_date" type="date" value="<?= $editing ? e($req['request_date']) : '' ?>"></div>
+        <div><label>Urgency</label>
+          <?php $urg = $editing ? ($req['urgency'] ?? '') : ''; ?>
+          <select name="urgency" id="urgency" onchange="syncUrgency()">
+            <option value="">— select urgency —</option>
+            <?php foreach (['ASAP/URGENT','ASAP - Partial Delivery Accepted','Specify Date Below','TBA - To Be Advised'] as $opt): ?>
+              <option value="<?= e($opt) ?>" <?= $urg === $opt ? 'selected' : '' ?>><?= e($opt) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div><label>Specific Delivery Date</label><input name="delivery_date" id="deliveryDate" type="date" value="<?= $editing ? e($req['delivery_date']) : '' ?>"></div>
+      </div>
     </div>
   </div>
 
@@ -260,13 +264,6 @@ function chip(v){ document.getElementById('q').value=v; load(v); }
 function fmt(n){ return (Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-// Mirror the selected project's title + code into the read-only display fields.
-function syncProject(){
-  const sel = document.getElementById('projectSelect');
-  const opt = sel.options[sel.selectedIndex];
-  document.getElementById('projTitle').value = opt ? (opt.dataset.title || '') : '';
-  document.getElementById('projCode').value  = opt ? (opt.dataset.code  || '') : '';
-}
 // The delivery-date picker only applies when urgency is "Specify Date Below".
 function syncUrgency(){
   const u = document.getElementById('urgency').value;
@@ -278,6 +275,5 @@ function syncUrgency(){
 }
 renderCart();
 load('');
-syncProject();
 syncUrgency();
 </script>
