@@ -23,9 +23,11 @@ final class XeroApiClient implements XeroClientInterface
             if (!$auth) return ['xero_po_id' => null, 'stubbed' => false, 'error' => 'Xero is not connected.'];
 
             $supplier = Db::one("SELECT * FROM suppliers WHERE id = ?", [(int)$po['supplier_id']]);
-            $contact = !empty($supplier['xero_contact_id'])
-                ? ['ContactID' => $supplier['xero_contact_id']]
-                : ['Name' => $supplier['name'] ?? ($po['supplier_name'] ?? 'Supplier')];
+            $contactId = self::ensureContactId($auth, $supplier, (int)$po['supplier_id'], $po['supplier_name'] ?? 'Supplier');
+            if (!$contactId) {
+                return ['xero_po_id' => null, 'stubbed' => false, 'error' => 'Could not resolve a Xero contact for this supplier.'];
+            }
+            $contact = ['ContactID' => $contactId];
 
             // The project maps to a Xero tracking option; carry it on every line so
             // spend is analysed against the project in Xero (Starship's whole point).
@@ -92,9 +94,11 @@ final class XeroApiClient implements XeroClientInterface
             if (!$auth) return ['xero_bill_id' => null, 'stubbed' => false, 'error' => 'Xero is not connected.'];
 
             $supplier = Db::one("SELECT * FROM suppliers WHERE id = ?", [(int)($bill['supplier_id'] ?? 0)]);
-            $contact = !empty($supplier['xero_contact_id'])
-                ? ['ContactID' => $supplier['xero_contact_id']]
-                : ['Name' => $supplier['name'] ?? 'Supplier'];
+            $contactId = self::ensureContactId($auth, $supplier, (int)($bill['supplier_id'] ?? 0), $supplier['name'] ?? 'Supplier');
+            if (!$contactId) {
+                return ['xero_bill_id' => null, 'stubbed' => false, 'error' => 'Could not resolve a Xero contact for this supplier.'];
+            }
+            $contact = ['ContactID' => $contactId];
 
             $lineItems = [];
             foreach ($lines as $l) {
@@ -131,6 +135,52 @@ final class XeroApiClient implements XeroClientInterface
         } catch (\Throwable $e) {
             return ['xero_bill_id' => null, 'stubbed' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Resolve a Xero ContactID for a supplier, creating the contact if needed.
+     * Xero's PurchaseOrders/Invoices endpoints reject a bare {Name} — they need
+     * a ContactID/ContactNumber — so we look one up (or create it) up front and
+     * cache it back onto the supplier row. Returns null if nothing resolvable.
+     */
+    private static function ensureContactId(array $auth, ?array $supplier, int $supplierId, ?string $fallbackName): ?string
+    {
+        if (!empty($supplier['xero_contact_id'])) return (string)$supplier['xero_contact_id'];
+
+        $name = trim((string)($supplier['name'] ?? $fallbackName ?? ''));
+        if ($name === '') return null;
+
+        $headers = [
+            'Authorization: Bearer ' . $auth['access_token'],
+            'Xero-tenant-id: ' . $auth['tenant_id'],
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ];
+
+        $contactId = null;
+
+        // 1) Look for an existing contact by exact name.
+        $where = 'Name=="' . str_replace('"', '\"', $name) . '"';
+        [$code, $body] = XeroOAuth::http('GET', self::API . 'Contacts?where=' . rawurlencode($where), $headers);
+        if ($code >= 200 && $code < 300) {
+            $json = json_decode($body, true);
+            $contactId = $json['Contacts'][0]['ContactID'] ?? null;
+        }
+
+        // 2) Otherwise create it.
+        if (!$contactId) {
+            [$code, $body] = XeroOAuth::http('POST', self::API . 'Contacts', $headers,
+                json_encode(['Contacts' => [['Name' => $name, 'IsSupplier' => true]]], JSON_UNESCAPED_UNICODE));
+            if ($code >= 200 && $code < 300) {
+                $json = json_decode($body, true);
+                $contactId = $json['Contacts'][0]['ContactID'] ?? null;
+            }
+        }
+
+        if ($contactId && $supplierId > 0) {
+            Db::q("UPDATE suppliers SET xero_contact_id = ? WHERE id = ?", [$contactId, $supplierId]);
+        }
+        return $contactId ? (string)$contactId : null;
     }
 
     /** Pull a human-readable message out of a Xero error/validation response. */
