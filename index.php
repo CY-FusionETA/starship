@@ -37,6 +37,13 @@ function parse_date_loose(string $s): ?string {
     return $ts ? date('Y-m-d', $ts) : null;
 }
 
+/** Pull the named list-filter keys out of $_GET, trimmed. Absent keys read as ''. */
+function filters_from_query(array $keys): array {
+    $out = [];
+    foreach ($keys as $k) $out[$k] = trim((string)($_GET[$k] ?? ''));
+    return $out;
+}
+
 Auth::start();
 $r = new Router();
 
@@ -253,7 +260,14 @@ $r->get('/aliases', function () {
 // --- Requisitions ---------------------------------------------------
 $r->get('/requisitions', function () {
     Auth::require();
-    Response::view('requisitions/index', ['requisitions' => RequisitionRepo::all()], 'Requisitions');
+    $f = filters_from_query(['q', 'status', 'project_id', 'from', 'to']);
+    Response::view('requisitions/index', [
+        'requisitions' => RequisitionRepo::all($f),
+        'filters'      => $f,
+        'projects'     => ProjectRepo::all(),
+        'statuses'     => RequisitionRepo::statuses(),
+        'total'        => RequisitionRepo::count(),
+    ], 'Requisitions');
 });
 $r->get('/requisitions/new', function () {
     Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
@@ -394,7 +408,15 @@ $r->post('/requisitions/{id}/delete', function ($p) {
 // --- Purchase Orders ------------------------------------------------
 $r->get('/purchase-orders', function () {
     Auth::require();
-    Response::view('purchase_orders/index', ['pos' => PurchaseOrderRepo::all()], 'Purchase Orders');
+    $f = filters_from_query(['q', 'status', 'supplier_id', 'project_id', 'xero', 'from', 'to']);
+    Response::view('purchase_orders/index', [
+        'pos'       => PurchaseOrderRepo::all($f),
+        'filters'   => $f,
+        'suppliers' => SupplierRepo::all(),
+        'projects'  => ProjectRepo::all(),
+        'statuses'  => PurchaseOrderRepo::statuses(),
+        'total'     => PurchaseOrderRepo::count(),
+    ], 'Purchase Orders');
 });
 $r->get('/purchase-orders/{id}', function ($p) {
     Auth::require();
@@ -436,7 +458,14 @@ $r->post('/purchase-orders/{id}/delete', function ($p) {
 // --- Delivery Orders (capture + 3-way match) ------------------------
 $r->get('/delivery-orders', function () {
     Auth::require();
-    Response::view('delivery_orders/index', ['dos' => DeliveryOrderRepo::all()], 'Delivery Orders');
+    $f = filters_from_query(['q', 'status', 'supplier_id', 'source', 'from', 'to']);
+    Response::view('delivery_orders/index', [
+        'dos'       => DeliveryOrderRepo::all($f),
+        'filters'   => $f,
+        'suppliers' => SupplierRepo::all(),
+        'statuses'  => DeliveryOrderRepo::statuses(),
+        'total'     => DeliveryOrderRepo::count(),
+    ], 'Delivery Orders');
 });
 $r->get('/delivery-orders/new', function () {
     Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
@@ -469,7 +498,7 @@ $r->post('/delivery-orders/save', function () {
 
     $header = $_POST;
     $header['image_path'] = $path;
-    $header['original_filename'] = basename(str_replace('\\', '/', (string)$_FILES['image']['name']));
+    $header['original_filename'] = DeliveryOrderRepo::cleanFilename((string)$_FILES['image']['name']);
     $lines = [];
 
     if ($ocr) {

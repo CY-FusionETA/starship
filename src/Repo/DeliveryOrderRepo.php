@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Repo;
 
 use App\Db;
+use App\Support\Filter;
 
 final class DeliveryOrderRepo
 {
@@ -20,15 +21,52 @@ final class DeliveryOrderRepo
         );
     }
 
-    public static function all(): array
+    /**
+     * Delivery orders, newest first, optionally filtered.
+     * $f: q (DO no / supplier / PO / raw refs / filename), status, supplier_id, source, from, to (delivery_date).
+     */
+    public static function all(array $f = []): array
     {
+        [$where, $args] = Filter::build([
+            Filter::search($f['q'] ?? '', [
+                'd.do_number', 's.name', 'po.po_number', 'd.po_reference_raw',
+                'd.project_code_raw', 'd.original_filename',
+            ]),
+            Filter::equals('d.status', $f['status'] ?? ''),
+            Filter::equals('d.supplier_id', $f['supplier_id'] ?? ''),
+            Filter::equals('d.source_channel', $f['source'] ?? ''),
+            Filter::dateFrom('d.delivery_date', $f['from'] ?? ''),
+            Filter::dateTo('d.delivery_date', $f['to'] ?? ''),
+        ]);
         return Db::all(
             "SELECT d.*, s.name AS supplier_name, po.po_number
              FROM delivery_orders d
              LEFT JOIN suppliers s ON s.id = d.supplier_id
              LEFT JOIN purchase_orders po ON po.id = d.purchase_order_id
-             ORDER BY d.created_at DESC"
+             {$where}
+             ORDER BY d.created_at DESC",
+            $args
         );
+    }
+
+    /** Statuses actually present, for the filter dropdown. */
+    public static function statuses(): array
+    {
+        return array_column(Db::all("SELECT DISTINCT status FROM delivery_orders ORDER BY status"), 'status');
+    }
+
+    public static function count(): int
+    {
+        return (int)Db::scalar("SELECT COUNT(*) FROM delivery_orders");
+    }
+
+    /** Keep a user-supplied/uploaded file name recognisable but harmless. */
+    public static function cleanFilename(string $name): ?string
+    {
+        $name = basename(str_replace('\\', '/', $name));
+        $name = preg_replace('/[\x00-\x1f"]/', '', $name) ?? $name;
+        $name = trim($name);
+        return $name === '' ? null : mb_substr($name, 0, 180);
     }
 
     public static function lines(int $doId): array
@@ -90,6 +128,8 @@ final class DeliveryOrderRepo
             'do_number'         => trim($h['do_number'] ?? '') ?: null,
             'delivery_date'     => trim($h['delivery_date'] ?? '') ?: null,
             'handwritten_notes' => trim($h['handwritten_notes'] ?? '') ?: null,
+            // Lets a DO captured before file names were recorded be labelled by hand.
+            'original_filename' => self::cleanFilename($h['original_filename'] ?? ''),
         ]);
         AuditRepo::log('delivery_order', $id, 'edit');
     }

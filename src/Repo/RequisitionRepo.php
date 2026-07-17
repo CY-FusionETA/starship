@@ -6,6 +6,7 @@ namespace App\Repo;
 use App\Db;
 use App\Auth;
 use App\Storage;
+use App\Support\Filter;
 
 final class RequisitionRepo
 {
@@ -22,15 +23,34 @@ final class RequisitionRepo
         );
     }
 
-    public static function all(): array
+    /**
+     * Requisitions, newest first, optionally filtered.
+     * $f: q (MR no / requester / project), status, project_id, from, to (request_date).
+     */
+    public static function all(array $f = []): array
     {
+        [$where, $args] = Filter::build([
+            Filter::search($f['q'] ?? '', ['r.mr_number', 'r.requested_by', 'p.project_code', 'p.name']),
+            Filter::equals('r.status', $f['status'] ?? ''),
+            Filter::equals('r.project_id', $f['project_id'] ?? ''),
+            Filter::dateFrom('r.request_date', $f['from'] ?? ''),
+            Filter::dateTo('r.request_date', $f['to'] ?? ''),
+        ]);
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code,
                     (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count,
                     (SELECT COUNT(*) FROM requisition_attachments a WHERE a.requisition_id = r.id) AS attachment_count
              FROM requisitions r JOIN projects p ON p.id = r.project_id
-             ORDER BY r.created_at DESC"
+             {$where}
+             ORDER BY r.created_at DESC",
+            $args
         );
+    }
+
+    /** Statuses actually present, for the filter dropdown. */
+    public static function statuses(): array
+    {
+        return array_column(Db::all("SELECT DISTINCT status FROM requisitions ORDER BY status"), 'status');
     }
 
     public static function count(): int

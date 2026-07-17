@@ -6,11 +6,22 @@ $ocrReady = cfg('gemini.api_key') && cfg('gemini.api_key') !== 'x'; ?>
 <p class="muted small" style="margin-top:0">Attach the signed DO photo. With AI reading on, Gemini extracts the supplier, DO/PO number, project code and every line for you to confirm.</p>
 <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
 
-<form method="post" action="<?= e($base) ?>/delivery-orders/save" enctype="multipart/form-data">
+<form method="post" action="<?= e($base) ?>/delivery-orders/save" enctype="multipart/form-data" id="doForm">
   <?= Csrf::field() ?>
+  <div class="alert" id="doErr" hidden></div>
   <div class="card">
-    <div class="row">
-      <div><label>DO image (photo / PDF) *</label><input type="file" name="image" accept="image/*,application/pdf" required></div>
+    <label style="display:block;margin-bottom:.35rem">Signed DO — photo or PDF *</label>
+    <label class="dropzone" id="doDrop" for="doFile">
+      <span class="dz-clip"><?= \App\Icons::svg('paperclip', 'clip-ico') ?></span>
+      <span class="dz-main">Drop the signed DO here, or <span class="dz-link">browse</span></span>
+      <span class="dz-sub">JPG, PNG, WEBP or PDF · one file · a phone photo is fine</span>
+      <!-- No `required`: a hidden required input is unfocusable, so Chrome would
+           block submit with an error it can't show. Checked in JS + server-side. -->
+      <input type="file" id="doFile" name="image" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" hidden>
+    </label>
+    <ul class="attach-list" id="doPicked" hidden></ul>
+
+    <div class="row" style="margin-top:.9rem">
       <div><label>DO No. <span class="muted small">(optional — AI fills)</span></label><input name="do_number" placeholder="auto"></div>
       <div><label>Delivery date</label><input name="delivery_date" type="date"></div>
     </div>
@@ -58,6 +69,64 @@ $ocrReady = cfg('gemini.api_key') && cfg('gemini.api_key') !== 'x'; ?>
 </form>
 
 <script>
+// ---- Signed DO picker: drop or browse, with a preview of what's attached ----
+const CLIP = <?= json_encode(\App\Icons::svg('paperclip', 'clip-ico')) ?>;
+const doFile = document.getElementById('doFile');
+const doDrop = document.getElementById('doDrop');
+const doPicked = document.getElementById('doPicked');
+let thumbUrl = null;
+
+function renderPicked(){
+  const f = doFile.files[0];
+  doPicked.hidden = !f;
+  doDrop.classList.toggle('has-file', !!f);
+  // Picking a file resolves the "attach one first" error — drop it right away.
+  if (f) { document.getElementById('doErr').hidden = true; doDrop.classList.remove('over'); }
+  if (thumbUrl) { URL.revokeObjectURL(thumbUrl); thumbUrl = null; }
+  if (!f) { doPicked.innerHTML = ''; return; }
+  const isImg = f.type.startsWith('image/');
+  let thumb = `<span class="ft-pill">${esc((f.name.split('.').pop()||'file').toUpperCase())}</span>`;
+  if (isImg) { thumbUrl = URL.createObjectURL(f); thumb = `<img class="ft-thumb" src="${thumbUrl}" alt="">`; }
+  doPicked.innerHTML = `
+    <li class="attach-row">
+      ${thumb}
+      <span class="clip">${CLIP}</span>
+      <span class="fn">${esc(f.name)}</span>
+      <span class="sz muted small">${size(f.size)}</span>
+      <button type="button" class="x" title="Remove" onclick="clearPicked()">×</button>
+    </li>`;
+}
+function clearPicked(){ doFile.value = ''; renderPicked(); }
+doFile.addEventListener('change', renderPicked);
+['dragenter','dragover'].forEach(ev => doDrop.addEventListener(ev, e => { e.preventDefault(); doDrop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => doDrop.addEventListener(ev, e => { e.preventDefault(); doDrop.classList.remove('over'); }));
+doDrop.addEventListener('drop', e => {
+  if (!e.dataTransfer.files.length) return;
+  const dt = new DataTransfer();
+  dt.items.add(e.dataTransfer.files[0]); // single DO per capture
+  doFile.files = dt.files;
+  renderPicked();
+});
+function size(b){
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return Math.round(b/1024) + ' KB';
+  return (b/1024/1024).toFixed(1) + ' MB';
+}
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+document.getElementById('doForm').addEventListener('submit', e => {
+  const err = document.getElementById('doErr');
+  if (!doFile.files.length) {
+    e.preventDefault();
+    err.textContent = 'Attach the signed DO first — a photo or PDF of it.';
+    err.hidden = false;
+    doDrop.classList.add('over');
+    doDrop.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  err.hidden = true;
+});
+renderPicked();
+
 let ix=0;
 function addLine(){
   const i=ix++;

@@ -80,10 +80,18 @@ $fsize = function ($b) {
     <span class="muted small" style="font-weight:400">— quotations supporting this requisition</span></h3>
   <?php if ($attachments): ?>
     <ul class="attach-list">
-      <?php foreach ($attachments as $a): ?>
+      <?php foreach ($attachments as $a):
+        $aUrl = $base . '/requisitions/' . (int)$req['id'] . '/attachments/' . (int)$a['id'] . '/file';
+        $aExt = strtoupper(pathinfo($a['original_filename'], PATHINFO_EXTENSION) ?: 'FILE');
+        $isImg = in_array(strtolower($aExt), ['jpg', 'jpeg', 'png', 'webp'], true); ?>
         <li class="attach-row">
+          <?php if ($isImg): ?>
+            <img class="ft-thumb" src="<?= e($aUrl) ?>" alt="">
+          <?php else: ?>
+            <span class="ft-pill"><?= e($aExt) ?></span>
+          <?php endif; ?>
           <span class="clip"><?= Icons::svg('paperclip', 'clip-ico') ?></span>
-          <a class="fn" href="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments/<?= (int)$a['id'] ?>/file" target="_blank"><?= e($a['original_filename']) ?></a>
+          <a class="fn" href="<?= e($aUrl) ?>" target="_blank"><?= e($a['original_filename']) ?></a>
           <span class="sz muted small"><?= e($fsize($a['size_bytes'])) ?><?= $a['uploaded_by_name'] ? ' · ' . e($a['uploaded_by_name']) : '' ?></span>
           <?php if ($canAttach || Auth::isAdmin()): ?>
             <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments/<?= (int)$a['id'] ?>/delete" onsubmit="return confirm('Remove <?= e($a['original_filename']) ?>?')" style="display:inline">

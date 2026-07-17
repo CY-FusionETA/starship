@@ -6,6 +6,7 @@ namespace App\Repo;
 use App\Db;
 use App\Auth;
 use App\Support\Normalizer;
+use App\Support\Filter;
 use App\Service\Xero\XeroClientFactory;
 
 final class PurchaseOrderRepo
@@ -23,15 +24,40 @@ final class PurchaseOrderRepo
         );
     }
 
-    public static function all(): array
+    /**
+     * Purchase orders, newest first, optionally filtered.
+     * $f: q (PO no / supplier / project), status, supplier_id, project_id, xero, from, to (order_date).
+     */
+    public static function all(array $f = []): array
     {
+        $clauses = [
+            Filter::search($f['q'] ?? '', ['po.po_number', 's.name', 'p.project_code', 'p.name']),
+            Filter::equals('po.status', $f['status'] ?? ''),
+            Filter::equals('po.supplier_id', $f['supplier_id'] ?? ''),
+            Filter::equals('po.project_id', $f['project_id'] ?? ''),
+            Filter::dateFrom('po.order_date', $f['from'] ?? ''),
+            Filter::dateTo('po.order_date', $f['to'] ?? ''),
+        ];
+        // Xero: synced = has an id from Xero; not-synced = never pushed.
+        if (($f['xero'] ?? '') === 'synced')     $clauses[] = ["po.xero_po_id IS NOT NULL AND po.xero_po_id != ''", []];
+        if (($f['xero'] ?? '') === 'not_synced') $clauses[] = ["(po.xero_po_id IS NULL OR po.xero_po_id = '')", []];
+
+        [$where, $args] = Filter::build($clauses);
         return Db::all(
             "SELECT po.*, s.name AS supplier_name, p.project_code
              FROM purchase_orders po
              JOIN suppliers s ON s.id = po.supplier_id
              JOIN projects p ON p.id = po.project_id
-             ORDER BY po.created_at DESC"
+             {$where}
+             ORDER BY po.created_at DESC",
+            $args
         );
+    }
+
+    /** Statuses actually present, for the filter dropdown. */
+    public static function statuses(): array
+    {
+        return array_column(Db::all("SELECT DISTINCT status FROM purchase_orders ORDER BY status"), 'status');
     }
 
     public static function count(): int

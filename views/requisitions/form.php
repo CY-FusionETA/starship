@@ -322,17 +322,27 @@ function showStep(which){
 // The file input is the source of truth; removing a file rebuilds it via DataTransfer.
 const quotes = document.getElementById('quotes');
 const dropzone = document.getElementById('dropzone');
+let thumbUrls = [];
 function renderQuotes(){
   const files = [...quotes.files];
   document.getElementById('stepQuoteCount').textContent = files.length;
   document.getElementById('quoteEmpty').hidden = files.length > 0;
-  document.getElementById('quoteList').innerHTML = files.map((f,i)=>`
-    <li class="attach-row">
+  thumbUrls.forEach(URL.revokeObjectURL);
+  thumbUrls = [];
+  document.getElementById('quoteList').innerHTML = files.map((f,i)=>{
+    let thumb = `<span class="ft-pill">${esc((f.name.split('.').pop()||'file').toUpperCase())}</span>`;
+    if(f.type.startsWith('image/')){
+      const u = URL.createObjectURL(f); thumbUrls.push(u);
+      thumb = `<img class="ft-thumb" src="${u}" alt="">`;
+    }
+    return `<li class="attach-row">
+      ${thumb}
       <span class="clip">${CLIP}</span>
       <span class="fn">${esc(f.name)}</span>
       <span class="sz muted small">${size(f.size)}</span>
       <button type="button" class="x" title="Remove" onclick="dropQuote(${i})">×</button>
-    </li>`).join('');
+    </li>`;
+  }).join('');
 }
 function dropQuote(idx){
   const dt = new DataTransfer();

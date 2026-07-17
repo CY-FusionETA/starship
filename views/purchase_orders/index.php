@@ -1,14 +1,42 @@
-<?php /** @var array $pos */
+<?php /** @var array $pos @var array $filters @var array $suppliers @var array $projects @var array $statuses @var int $total */
 use App\Csrf; use App\Auth;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $isAdmin = Auth::isAdmin();
 $sb = fn($s) => '<span class="badge ' . (['draft'=>'muted','issued'=>'brand','partially_received'=>'warn','fully_received'=>'ok','closed'=>'muted','cancelled'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>'; ?>
 <h1>Purchase Orders</h1>
+
+<?php
+$fbAction = '/purchase-orders';
+$fbFilters = $filters;
+$fbPlaceholder = 'Search PO no., supplier or project…';
+$fbFields = [
+    ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'all' => 'All statuses',
+     'options' => array_combine($statuses, array_map(fn($s) => ucfirst(str_replace('_', ' ', $s)), $statuses))],
+    ['name' => 'supplier_id', 'label' => 'Supplier', 'type' => 'select', 'all' => 'All suppliers',
+     'options' => array_column($suppliers, 'name', 'id')],
+    ['name' => 'project_id', 'label' => 'Project', 'type' => 'select', 'all' => 'All projects',
+     'options' => array_column($projects, 'project_code', 'id')],
+    ['name' => 'xero', 'label' => 'Xero', 'type' => 'select', 'all' => 'Xero: any',
+     'options' => ['synced' => 'Xero: synced', 'not_synced' => 'Xero: not synced']],
+    ['name' => 'from', 'label' => 'From', 'type' => 'date'],
+    ['name' => 'to',   'label' => 'To',   'type' => 'date'],
+];
+$fbShown = count($pos);
+$fbTotal = $total;
+$fbNoun  = 'purchase order';
+include VIEW_ROOT . '/partials/filterbar.php';
+?>
+
 <div class="card">
   <table>
     <thead><tr><th>PO No.</th><th>Supplier</th><th>Project</th><th>Order date</th><th>Total (MYR)</th><th>Xero</th><th>Status</th><th></th></tr></thead>
     <tbody>
-    <?php if (!$pos): ?><tr><td colspan="8" class="muted">No purchase orders yet.</td></tr>
+    <?php if (!$pos): ?>
+      <tr><td colspan="8" class="empty-cell">
+        <?= $total > 0
+            ? 'No purchase orders match these filters. <a href="' . e($base) . '/purchase-orders">Clear them</a> to see all ' . (int)$total . '.'
+            : 'No purchase orders yet.' ?>
+      </td></tr>
     <?php else: foreach ($pos as $po): ?>
       <tr>
         <td><strong><?= e($po['po_number']) ?></strong></td>

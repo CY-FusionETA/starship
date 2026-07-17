@@ -183,6 +183,11 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
     <h3 style="margin-bottom:.5rem">Attachments <span class="badge muted"><?= $fileExists ? 1 : 0 ?></span></h3>
     <ul class="attach-list">
       <li class="attach-row">
+        <?php if ($fileExists && $ext !== 'pdf'): ?>
+          <img class="ft-thumb" src="<?= e($fileUrl) ?>" alt="">
+        <?php else: ?>
+          <span class="ft-pill"><?= e(strtoupper($ext ?: 'FILE')) ?></span>
+        <?php endif; ?>
         <span class="clip"><?= \App\Icons::svg('paperclip', 'clip-ico') ?></span>
         <?php if ($fileExists): ?>
           <a class="fn" href="<?= e($fileUrl) ?>" target="_blank"><?= e($fileName) ?></a>
@@ -193,6 +198,12 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
         <?php endif; ?>
       </li>
     </ul>
+    <?php if (trim((string)($do['original_filename'] ?? '')) === '' && $fileExists): ?>
+      <p class="muted small" style="margin:.4rem 0 0">
+        Captured before file names were recorded — the original name wasn’t saved.
+        Set it under <em>Edit delivery order details</em> below.
+      </p>
+    <?php endif; ?>
     <?php if (!$fileExists): ?>
       <p class="muted small" style="margin:.4rem 0 0">The uploaded file is no longer available. Please re-capture this delivery order.</p>
     <?php elseif ($ext !== 'pdf'): ?>
@@ -214,6 +225,8 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
       <div class="row">
         <div><label>DO number</label><input name="do_number" value="<?= e($do['do_number']) ?>"></div>
         <div><label>Delivery date</label><input name="delivery_date" value="<?= e($do['delivery_date']) ?>" placeholder="YYYY-MM-DD"></div>
+        <div><label>File name <span class="muted small">(shown under Attachments)</span></label>
+          <input name="original_filename" value="<?= e($do['original_filename'] ?? '') ?>" placeholder="<?= e($fileName) ?>"></div>
       </div>
       <label>Notes</label>
       <input name="handwritten_notes" value="<?= e($do['handwritten_notes']) ?>">
