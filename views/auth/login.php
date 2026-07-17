@@ -7,7 +7,7 @@ $demoUsers = [
     // Labels track the account's real role — see App\Perm::LABELS.
     ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin',  'initials' => 'SC'],
     ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin',  'initials' => 'CA'],
-    ['email' => 'staff@fusioneta.com',  'name' => 'Staff',  'role' => 'Procurement', 'initials' => 'ST'],
+    ['email' => 'procurement@fusioneta.com', 'name' => 'Procurement', 'role' => 'Procurement', 'initials' => 'PR'],
     ['email' => 'mr@fusioneta.com',     'name' => 'MR',     'role' => 'Requester',   'initials' => 'MR'],
 ];
 $demoPassword = 'demo123'; ?>
