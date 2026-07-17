@@ -537,3 +537,27 @@ td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
 @media(prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ---- Cute global loading overlay (the little Starship rocket) ------------ */
+.ship-loader{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+  background:rgba(244,246,251,.72);backdrop-filter:blur(6px) saturate(1.1);-webkit-backdrop-filter:blur(6px) saturate(1.1)}
+.ship-loader.on{display:flex;animation:sl-fade .22s var(--ease)}
+@keyframes sl-fade{from{opacity:0}to{opacity:1}}
+.sl-card{display:flex;flex-direction:column;align-items:center;gap:.9rem;padding:2rem 2.4rem;
+  background:#fff;border:1px solid var(--fe-border);border-radius:22px;
+  box-shadow:0 20px 55px rgba(26,46,111,.20);min-width:min(88vw,320px);text-align:center}
+.sl-stage{position:relative;width:88px;height:64px;display:flex;align-items:flex-end;justify-content:center}
+.sl-rocket{font-size:2.9rem;line-height:1;filter:drop-shadow(0 7px 9px rgba(255,107,53,.4));
+  animation:sl-bob 1.15s ease-in-out infinite}
+@keyframes sl-bob{0%,100%{transform:translateY(2px) rotate(-8deg)}50%{transform:translateY(-12px) rotate(8deg)}}
+.sl-thrust{display:flex;gap:.42rem;height:.55rem;margin-top:.15rem}
+.sl-thrust i{width:.5rem;height:.5rem;border-radius:50%;background:var(--fe-accent);
+  animation:sl-pop 1.15s ease-in-out infinite}
+.sl-thrust i:nth-child(2){animation-delay:.16s}
+.sl-thrust i:nth-child(3){animation-delay:.32s}
+@keyframes sl-pop{0%,100%{transform:scale(.55);opacity:.35}50%{transform:scale(1);opacity:.95}}
+.sl-msg{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;color:var(--fe-primary);
+  font-size:1.02rem;max-width:24ch;min-height:2.5em;display:flex;align-items:center}
+.sl-msg span{animation:sl-msg-in .32s var(--ease)}
+.sl-sub{color:var(--fe-muted);font-size:.78rem;margin-top:-.35rem}
+@keyframes sl-msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}

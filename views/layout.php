@@ -55,5 +55,62 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
     <div class="content"><?= $content ?></div>
   </div>
 </div>
+
+<!-- Cute global loading overlay — shows on any real form submit (Xero pushes,
+     approvals, saves) so a slow round-trip feels intentional, not laggy. -->
+<div class="ship-loader" id="shipLoader" role="status" aria-live="polite" aria-hidden="true">
+  <div class="sl-card">
+    <div class="sl-stage"><div class="sl-rocket">🚀</div></div>
+    <div class="sl-thrust"><i></i><i></i><i></i></div>
+    <div class="sl-msg" id="slMsg"><span>Launching…</span></div>
+    <div class="sl-sub">just a moment ✨</div>
+  </div>
+</div>
+<script>
+(function(){
+  var el = document.getElementById('shipLoader');
+  var msgEl = document.getElementById('slMsg');
+  var MSGS = [
+    "Launching your request into orbit… 🚀",
+    "Beaming your PO up to Xero… ✨",
+    "Chatting with the accounting robots… 🤖",
+    "Packing your purchase order with care… 📦",
+    "Doing the boring paperwork for you… 🪄",
+    "Zooming through hyperspace… 🌌",
+    "Tightening the last little bolt… 🔧",
+    "Almost there — you look great today 💫",
+  ];
+  var showTimer = null, cycleTimer = null;
+  function pick(){ return MSGS[Math.floor(Math.random()*MSGS.length)]; }
+  function paint(m){ msgEl.innerHTML = '<span>' + m + '</span>'; }
+  function show(msg){
+    paint(msg || pick());
+    el.classList.add('on'); el.setAttribute('aria-hidden','false');
+    clearInterval(cycleTimer);
+    cycleTimer = setInterval(function(){ paint(pick()); }, 2600);
+  }
+  function hide(){
+    clearTimeout(showTimer); clearInterval(cycleTimer);
+    el.classList.remove('on'); el.setAttribute('aria-hidden','true');
+  }
+  // Delay the reveal so instant navigations never flash the loader.
+  function scheduleShow(msg){ clearTimeout(showTimer); showTimer = setTimeout(function(){ show(msg); }, 220); }
+
+  document.addEventListener('submit', function(e){
+    if (e.defaultPrevented) return;                    // validation failed / confirm() cancelled
+    var f = e.target;
+    if (!f || f.nodeName !== 'FORM') return;
+    if (f.hasAttribute('data-no-loader')) return;      // opt-out for instant/inline forms
+    if (f.getAttribute('target') === '_blank') return; // opens elsewhere, page stays put
+    scheduleShow(f.getAttribute('data-loader-msg'));
+  }, false);
+
+  // Let AJAX flows drive it too: window.shipLoader.show('…') / .hide()
+  window.shipLoader = { show: show, hide: hide, scheduleShow: scheduleShow };
+  // Never leave it stuck when arriving via the back/forward cache.
+  window.addEventListener('pageshow', hide);
+  window.addEventListener('pagehide', hide);
+})();
+</script>
 </body>
 </html>

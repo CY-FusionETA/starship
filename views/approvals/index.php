@@ -40,7 +40,7 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
             <?= Csrf::field() ?><input type="hidden" name="return" value="approvals">
             <button class="btn sm ghost-danger">Reject</button>
           </form>
-          <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$r['id'] ?>/approve" style="display:inline">
+          <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$r['id'] ?>/approve" style="display:inline" data-loader-msg="Approving &amp; sending your PO to Xero… 🚀">
             <?= Csrf::field() ?><input type="hidden" name="return" value="approvals">
             <button class="btn sm">Approve ✓</button>
           </form>

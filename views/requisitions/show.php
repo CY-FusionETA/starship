@@ -33,7 +33,7 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
         <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/reject" onsubmit="return confirm('Reject this requisition?')" style="display:inline">
           <?= Csrf::field() ?><button class="btn sm ghost-danger">Reject</button>
         </form>
-        <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/approve" style="display:inline">
+        <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/approve" style="display:inline" data-loader-msg="Approving &amp; sending your PO to Xero… 🚀">
           <?= Csrf::field() ?><button class="btn sm">Approve ✓</button>
         </form>
       <?php else: ?>
