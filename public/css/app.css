@@ -132,6 +132,21 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
 .login-card .brand{font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.5rem;
   color:var(--fe-primary);margin-bottom:.15rem;letter-spacing:-.02em}
 .login-card .btn{margin-top:.2rem}
+
+/* ---- One-click demo logins ---- */
+.demo-sep{display:flex;align-items:center;gap:.7rem;margin:1.3rem 0 .9rem;color:var(--fe-muted);font-size:.78rem}
+.demo-sep::before,.demo-sep::after{content:"";flex:1;height:1px;background:var(--fe-border)}
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.demo-btn{display:flex;align-items:center;gap:.55rem;text-align:left;cursor:pointer;font:inherit;
+  border:1px solid var(--fe-border);background:#fff;border-radius:var(--radius-btn);padding:.5rem .6rem;
+  transition:border-color .15s var(--ease),background .15s var(--ease),transform .12s var(--ease)}
+.demo-btn:hover{border-color:var(--fe-primary-2);background:#f7f9ff;transform:translateY(-1px)}
+.demo-av{display:grid;place-items:center;flex:0 0 auto;width:1.9rem;height:1.9rem;border-radius:50%;
+  background:var(--fe-grad);color:#fff;font-size:.7rem;font-weight:700;letter-spacing:.02em}
+.demo-who{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.demo-name{font-weight:600;font-size:.85rem;color:var(--fe-text)}
+.demo-role{font-size:.72rem;color:var(--fe-muted)}
+@media(max-width:380px){.demo-grid{grid-template-columns:1fr}}
 .muted{color:var(--fe-muted)}.small{font-size:.85rem}
 
 /* ---- Requisition builder (search + cart) ---- */

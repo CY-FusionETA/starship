@@ -1,6 +1,16 @@
 <?php /** @var ?string $error */
 use App\Csrf;
-$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
+$base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
+// One-click demo logins. These credentials are public to anyone who opens the
+// page — keep the accounts on demo data only.
+$demoUsers = [
+    // Carmen is role=admin, same as Simon — the app labels both "Superadmin".
+    ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin', 'initials' => 'SC'],
+    ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin', 'initials' => 'CA'],
+    ['email' => 'staff@fusioneta.com',  'name' => 'Staff',  'role' => 'Staff',      'initials' => 'ST'],
+    ['email' => 'mr@fusioneta.com',     'name' => 'MR',     'role' => 'Requester',  'initials' => 'MR'],
+];
+$demoPassword = 'demo123'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,7 +32,32 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
     <label for="password">Password</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>
     <div style="margin-top:1.2rem"><button class="btn" style="width:100%">Sign in</button></div>
+
+    <div class="demo-sep"><span>or sign in as</span></div>
+    <div class="demo-grid">
+      <?php foreach ($demoUsers as $u): ?>
+        <button type="button" class="demo-btn"
+                onclick="demoLogin('<?= e($u['email']) ?>')"
+                title="<?= e($u['email']) ?>">
+          <span class="demo-av"><?= e($u['initials']) ?></span>
+          <span class="demo-who">
+            <span class="demo-name"><?= e($u['name']) ?></span>
+            <span class="demo-role"><?= e($u['role']) ?></span>
+          </span>
+        </button>
+      <?php endforeach; ?>
+    </div>
   </form>
 </div>
+<script>
+// Fill the real fields and submit the real form, so the demo path goes through
+// exactly the same POST /login (and CSRF check) as typing the details by hand.
+const DEMO_PASSWORD = <?= json_encode($demoPassword) ?>;
+function demoLogin(email){
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = DEMO_PASSWORD;
+  document.querySelector('.login-card').submit();
+}
+</script>
 </body>
 </html>
