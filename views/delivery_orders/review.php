@@ -1,4 +1,4 @@
-<?php /** @var array $do @var array $lines @var array $poLines @var array $openPos */
+<?php /** @var array $do @var array $lines @var array $poLines @var array $openPos @var bool $hasOver @var ?string $error */
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $confirmed = false;
@@ -7,10 +7,12 @@ $hasPo = !empty($do['purchase_order_id']);
 $fmt = fn($n) => $n === null ? '' : rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
 $vbadge = function (?string $v): string {
     if (!$v) return '<span class="badge muted">—</span>';
-    $c = ['fully_received'=>'ok','partially_received'=>'warn','over'=>'warn','price_variance'=>'warn','unmatched'=>'danger','no_po'=>'danger','no_signature'=>'danger'][$v] ?? 'muted';
+    $c = ['fully_received'=>'ok','partially_received'=>'warn','over'=>'warn','rejected'=>'danger','unmatched'=>'danger'][$v] ?? 'muted';
     return '<span class="badge ' . $c . '">' . e(str_replace('_',' ',$v)) . '</span>';
 };
 $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','exception'=>'danger'][$do['status']] ?? 'muted'; ?>
+
+<?php if (!empty($error)): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
 
 <div class="toolbar">
   <div>
@@ -33,7 +35,13 @@ $dostatus = ['received'=>'muted','needs_review'=>'warn','matched'=>'ok','excepti
   </div>
 </div>
 
-<?php if ($do['match_summary']): ?><div class="card" style="background:#f0fdf4;border-color:#bbf7d0"><strong><?= e($do['match_summary']) ?></strong></div><?php endif; ?>
+<?php if ($do['match_summary']): ?>
+  <?php // Green would read as "all good" on a delivery that's short or over. ?>
+  <?php $sumTone = $do['status'] === 'exception'
+      ? 'background:#fffbeb;border-color:#fde68a'
+      : (str_contains((string)$do['match_summary'], 'backorder') ? 'background:#f8fafc;border-color:var(--fe-border)' : 'background:#f0fdf4;border-color:#bbf7d0'); ?>
+  <div class="card" style="<?= $sumTone ?>"><strong><?= e($do['match_summary']) ?></strong></div>
+<?php endif; ?>
 
 <?php if ($hasPo && $poFulfil): ?>
 <?php
@@ -70,7 +78,13 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
     </tbody>
   </table>
   <?php endif; ?>
-  <p class="muted small" style="margin:.45rem 0 0"><?= $pct ?>% of this PO delivered across all DOs<?= $poFulfil['outstanding'] > 1e-6 ? ' · ' . $fmtq($poFulfil['outstanding']) . ' still to come' : ' · fully received ✅' ?></p>
+  <?php // "fully received" would be a lie on an over-received PO — say so plainly.
+        $overQty = max(0, $poFulfil['received'] - $poFulfil['ordered']); ?>
+  <p class="muted small" style="margin:.45rem 0 0"><?= $pct ?>% of this PO delivered across all DOs<?php
+    if ($poFulfil['outstanding'] > 1e-6) { echo ' · ' . $fmtq($poFulfil['outstanding']) . ' still to come'; }
+    elseif ($overQty > 1e-6)             { echo ' · ' . $fmtq($overQty) . ' more than ordered ⚠️'; }
+    else                                  { echo ' · fully received ✅'; }
+  ?></p>
 </div>
 <?php endif; ?>
 
@@ -93,46 +107,116 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
             </tbody>
           </table>
         <?php else: ?>
-        <table>
-          <thead><tr><th>DO line</th><th>Qty</th><th>Match to PO line</th><th>Score</th><th>Verdict</th></tr></thead>
-          <tbody>
-          <?php foreach ($lines as $l): ?>
-            <tr>
-              <td><?= e($l['ocr_description']) ?><?= $l['ocr_supplier_code'] ? ' <span class="badge code">'.e($l['ocr_supplier_code']).'</span>' : '' ?></td>
-              <td style="width:90px"><input style="min-width:70px" name="line[<?= (int)$l['id'] ?>][qty]" type="number" step="any" min="0" value="<?= e($fmt($l['qty_accepted'] ?? $l['ocr_qty'])) ?>"></td>
-              <td>
-                <select name="line[<?= (int)$l['id'] ?>][po_line_id]">
-                  <option value="">— unmatched —</option>
+        <p class="muted small" style="margin-top:0">
+          For each line say what <strong>arrived</strong> and how much you <strong>accepted</strong>.
+          Anything you don't accept is recorded as refused with a reason, stays owed by the supplier,
+          and never counts as received.
+        </p>
+        <div class="recv-lines">
+          <?php foreach ($lines as $l):
+            $bal = null;
+            foreach ($poLines as $pl) { if ((int)$pl['id'] === (int)$l['matched_po_line_id']) { $bal = (float)$pl['balance_qty']; break; } }
+            $delivered = $fmt($l['qty_delivered'] ?? $l['ocr_qty']); ?>
+            <div class="recv-line" data-id="<?= (int)$l['id'] ?>">
+              <div class="rl-head">
+                <div class="rl-desc"><?= e($l['ocr_description']) ?>
+                  <?= $l['ocr_supplier_code'] ? ' <span class="badge code">'.e($l['ocr_supplier_code']).'</span>' : '' ?>
+                  <?= $l['match_score'] !== null
+                      ? ' <span class="badge '.($l['match_score']>=82?'ok':'warn').'" title="'.e($l['match_method']).' match">'.e($fmt($l['match_score'])).'%</span>'
+                      : '' ?>
+                </div>
+                <select class="rl-po" name="line[<?= (int)$l['id'] ?>][po_line_id]" data-bal="">
+                  <option value="">— not on this PO —</option>
                   <?php foreach ($poLines as $pl): ?>
-                    <option value="<?= (int)$pl['id'] ?>" <?= (int)$l['matched_po_line_id'] === (int)$pl['id'] ? 'selected' : '' ?>>
-                      L<?= (int)$pl['line_no'] ?> · <?= e($pl['description']) ?> (bal <?= $fmt($pl['balance_qty']) ?>)
+                    <option value="<?= (int)$pl['id'] ?>" data-bal="<?= (float)$pl['balance_qty'] ?>"
+                            <?= (int)$l['matched_po_line_id'] === (int)$pl['id'] ? 'selected' : '' ?>>
+                      L<?= (int)$pl['line_no'] ?> · <?= e($pl['description']) ?> (<?= $fmt($pl['balance_qty']) ?> <?= e($pl['uom'] ?: '') ?> outstanding)
                     </option>
                   <?php endforeach; ?>
                 </select>
-              </td>
-              <td><?= $l['match_score'] !== null ? '<span class="badge '.($l['match_score']>=82?'ok':'warn').'">'.e($fmt($l['match_score'])).'%</span> <span class="muted small">'.e($l['match_method']).'</span>' : '<span class="muted">—</span>' ?></td>
-              <td><?= $vbadge($l['verdict']) ?></td>
-            </tr>
+              </div>
+              <div class="rl-qty">
+                <label>Delivered
+                  <input class="rl-delivered" name="line[<?= (int)$l['id'] ?>][qty_delivered]" type="number" step="any" min="0"
+                         value="<?= e($delivered) ?>" oninput="recalc(this)">
+                </label>
+                <label>Accepted
+                  <input class="rl-accepted" name="line[<?= (int)$l['id'] ?>][qty]" type="number" step="any" min="0"
+                         value="<?= e($fmt($l['qty_accepted'] ?? $l['ocr_qty'])) ?>" oninput="recalc(this)">
+                </label>
+                <span class="rl-uom muted small"><?= e($l['ocr_uom'] ?: '') ?></span>
+                <span class="rl-rejected" hidden>Rejected <strong class="rl-rej-n">0</strong></span>
+              </div>
+              <div class="rl-reject" hidden>
+                <label>Why weren't they accepted? *
+                  <select class="rl-reason" name="line[<?= (int)$l['id'] ?>][reject_reason]">
+                    <option value="">— pick a reason —</option>
+                    <?php foreach (\App\Service\MatchingService::REASONS as $k => $lbl): ?>
+                      <option value="<?= e($k) ?>" <?= ($l['reject_reason'] ?? '') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </label>
+                <label>Note <span class="muted small">(optional)</span>
+                  <input name="line[<?= (int)$l['id'] ?>][reject_note]" value="<?= e($l['reject_note'] ?? '') ?>"
+                         placeholder="e.g. 3 crushed in transit, driver took them back">
+                </label>
+              </div>
+              <p class="rl-warn" hidden></p>
+            </div>
           <?php endforeach; ?>
-          </tbody>
-        </table>
+        </div>
         <div style="margin-top:1rem"><button class="btn" <?= $hasPo ? '' : 'disabled' ?>>Confirm &amp; post receipts</button></div>
-        <p class="muted small">Confirming updates cumulative received quantities on the PO, keeps backorders open, and teaches the supplier-alias table. Xero billing comes in a later phase.</p>
+        <p class="muted small">
+          Only the accepted quantity is receipted against the PO. Short or refused
+          goods stay outstanding so the supplier still owes them. Accepting more
+          than was ordered is allowed but held for a PM to sign off.
+        </p>
         <?php endif; ?>
       </div>
     </form>
+    <script>
+    // Rejected = delivered − accepted. The reason box only appears when there is
+    // something to explain, and over-delivery is flagged before you submit.
+    function recalc(el){
+      const row = el.closest('.recv-line');
+      const del = parseFloat(row.querySelector('.rl-delivered').value) || 0;
+      const acc = parseFloat(row.querySelector('.rl-accepted').value) || 0;
+      const rej = Math.round((del - acc) * 1e6) / 1e6;
+      const sel = row.querySelector('.rl-po');
+      const bal = parseFloat(sel.selectedOptions[0]?.dataset.bal ?? '');
+
+      row.querySelector('.rl-rejected').hidden = !(rej > 0);
+      row.querySelector('.rl-rej-n').textContent = rej > 0 ? rej : 0;
+      row.querySelector('.rl-reject').hidden = !(rej > 0);
+      row.querySelector('.rl-reason').required = rej > 0;
+
+      const warn = row.querySelector('.rl-warn');
+      let msg = '';
+      if (acc > del + 1e-6) msg = `You can't accept ${acc} when only ${del} arrived.`;
+      else if (!isNaN(bal) && acc > bal + 1e-6) msg = `${acc} is more than the ${bal} still outstanding — a PM will need to sign off the overage.`;
+      warn.textContent = msg;
+      warn.hidden = !msg;
+      warn.className = 'rl-warn' + (acc > del + 1e-6 ? ' is-error' : ' is-warn');
+    }
+    document.querySelectorAll('.rl-po').forEach(s => s.addEventListener('change', () => recalc(s)));
+    document.querySelectorAll('.recv-line').forEach(r => recalc(r.querySelector('.rl-accepted')));
+    </script>
     <?php else: ?>
       <div class="card">
-        <h3>Matched result</h3>
+        <h3>Received</h3>
         <table>
-          <thead><tr><th>DO line</th><th>Qty accepted</th><th>Matched item</th><th>Method</th><th>Verdict</th></tr></thead>
+          <thead><tr><th>DO line</th><th>Delivered</th><th>Accepted</th><th>Rejected</th><th>Verdict</th></tr></thead>
           <tbody>
           <?php foreach ($lines as $l): ?>
             <tr>
-              <td><?= e($l['ocr_description']) ?></td>
-              <td><?= e($fmt($l['qty_accepted'])) ?></td>
-              <td><?= $l['matched_catalogue_item_id'] ? 'item #'.(int)$l['matched_catalogue_item_id'] : '<span class="muted">—</span>' ?></td>
-              <td class="small muted"><?= e($l['match_method'] ?: '—') ?><?= $l['match_score']!==null ? ' ('.e($fmt($l['match_score'])).'%)' : '' ?></td>
+              <td><?= e($l['ocr_description']) ?>
+                <?php if ((float)($l['qty_rejected'] ?? 0) > 0 && $l['reject_reason']): ?>
+                  <div class="muted small"><?= e(\App\Service\MatchingService::REASONS[$l['reject_reason']] ?? $l['reject_reason']) ?><?= $l['reject_note'] ? ' — “' . e($l['reject_note']) . '”' : '' ?></div>
+                <?php endif; ?>
+              </td>
+              <td><?= e($fmt($l['qty_delivered'] ?? $l['ocr_qty'])) ?></td>
+              <td><strong><?= e($fmt($l['qty_accepted'])) ?></strong></td>
+              <td><?= (float)($l['qty_rejected'] ?? 0) > 0 ? '<span class="badge danger">' . e($fmt($l['qty_rejected'])) . '</span>' : '<span class="muted">—</span>' ?></td>
               <td><?= $vbadge($l['verdict']) ?></td>
             </tr>
           <?php endforeach; ?>
@@ -140,6 +224,33 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
         </table>
         <?php if ($do['purchase_order_id']): ?><p style="margin-top:.8rem"><a class="btn sm secondary" href="<?= e($base) ?>/purchase-orders/<?= (int)$do['purchase_order_id'] ?>">View PO receipts →</a></p><?php endif; ?>
       </div>
+
+      <?php if (!empty($hasOver)): ?>
+        <div class="card over-card">
+          <h3 style="margin-top:0">⚠️ More was delivered than ordered</h3>
+          <?php if (!empty($do['over_approved_at'])): ?>
+            <p class="muted small" style="margin:0">
+              ✓ Signed off <?= e($do['over_approved_at']) ?><?= $do['over_approval_note'] ? ' — “' . e($do['over_approval_note']) . '”' : '' ?>.
+            </p>
+          <?php else: ?>
+            <p class="small" style="margin-top:0">
+              The goods are recorded, but this delivery stays an exception until a PM accepts taking
+              more than the PO ordered. To refuse the surplus instead, send it back and re-capture
+              the DO with the correct quantity, or amend the PO.
+            </p>
+            <?php if (\App\Perm::can('do_approve_over')): ?>
+              <form method="post" action="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/approve-over" class="row" style="align-items:flex-end">
+                <?= Csrf::field() ?>
+                <div style="flex:2"><label>Note <span class="muted small">(optional)</span></label>
+                  <input name="note" placeholder="e.g. agreed with supplier, surplus kept for V50"></div>
+                <div><button class="btn">Approve the overage</button></div>
+              </form>
+            <?php else: ?>
+              <p class="muted small" style="margin:0">⏳ Waiting for a PM or superadmin to sign this off.</p>
+            <?php endif; ?>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
     <?php endif; ?>
 
     <?php if (!$confirmed): ?>

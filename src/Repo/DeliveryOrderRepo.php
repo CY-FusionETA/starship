@@ -97,6 +97,41 @@ final class DeliveryOrderRepo
              LEFT JOIN purchase_orders po ON po.id = d.purchase_order_id{$w}", $a);
     }
 
+    /** True once any line has been confirmed — receipts have been posted. */
+    public static function isConfirmed(int $doId): bool
+    {
+        return (bool)Db::scalar("SELECT 1 FROM do_lines WHERE delivery_order_id = ? AND is_confirmed = 1 LIMIT 1", [$doId]);
+    }
+
+    /** True when a confirmed line pushed its PO line past what was ordered. */
+    public static function hasOverDelivery(int $doId): bool
+    {
+        return (bool)Db::scalar(
+            "SELECT 1 FROM do_lines dl JOIN po_lines pl ON pl.id = dl.matched_po_line_id
+             WHERE dl.delivery_order_id = ? AND dl.is_confirmed = 1
+               AND pl.qty_received > pl.qty_ordered + 0.000001 LIMIT 1",
+            [$doId]
+        );
+    }
+
+    public static function hasUnmatchedLines(int $doId): bool
+    {
+        return (bool)Db::scalar(
+            "SELECT 1 FROM do_lines WHERE delivery_order_id = ? AND is_confirmed = 1
+               AND matched_po_line_id IS NULL LIMIT 1",
+            [$doId]
+        );
+    }
+
+    /** Rejected lines on this DO, for the review screen + PO page. */
+    public static function rejectedLines(int $doId): array
+    {
+        return Db::all(
+            "SELECT * FROM do_lines WHERE delivery_order_id = ? AND qty_rejected > 0.000001 ORDER BY line_no",
+            [$doId]
+        );
+    }
+
     /** Keep a user-supplied/uploaded file name recognisable but harmless. */
     public static function cleanFilename(string $name): ?string
     {
@@ -191,8 +226,8 @@ final class DeliveryOrderRepo
                 Db::q("UPDATE po_lines SET qty_received = MAX(0, qty_received - ?) WHERE id = ?", [$qty, $poLineId]);
                 $pl = Db::one("SELECT purchase_order_id, qty_received, qty_ordered FROM po_lines WHERE id = ?", [$poLineId]);
                 if ($pl) {
-                    $recv = (float)$pl['qty_received']; $ord = (float)$pl['qty_ordered'];
-                    $st = $recv > $ord + 1e-6 ? 'over_received' : (abs($recv - $ord) < 1e-6 && $ord > 0 ? 'fully_received' : ($recv > 0 ? 'partially_received' : 'open'));
+                    // Same definition as posting — never a second copy of this rule.
+                    $st = \App\Service\MatchingService::lineStatus((float)$pl['qty_received'], (float)$pl['qty_ordered']);
                     Db::update('po_lines', $poLineId, ['line_status' => $st]);
                     $touched[(int)$pl['purchase_order_id']] = true;
                 }

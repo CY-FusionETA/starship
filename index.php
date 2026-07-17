@@ -590,6 +590,8 @@ $r->get('/delivery-orders/{id}', function ($p) {
         'poAllLines' => $poId ? PurchaseOrderRepo::lines($poId) : [],
         'poFulfil'   => $poId ? PurchaseOrderRepo::fulfilment($poId) : null,
         'openPos'    => PurchaseOrderRepo::openForSelect(),
+        'hasOver'    => DeliveryOrderRepo::hasOverDelivery((int)$p['id']),
+        'error'      => $_GET['err'] ?? null,
     ], 'DO ' . ($do['do_number'] ?: $p['id']));
 });
 $r->post('/delivery-orders/{id}/relink', function ($p) {
@@ -603,8 +605,20 @@ $r->post('/delivery-orders/{id}/relink', function ($p) {
 $r->post('/delivery-orders/{id}/confirm', function ($p) {
     Perm::require("do_confirm");
     Csrf::check();
-    MatchingService::commit((int)$p['id'], $_POST['line'] ?? []);
-    Response::redirect('/delivery-orders/' . (int)$p['id']);
+    $id = (int)$p['id'];
+    do_or_404($id);
+    [, $err] = MatchingService::commit($id, $_POST['line'] ?? []);
+    Response::redirect('/delivery-orders/' . $id . ($err ? '?err=' . rawurlencode($err) : ''));
+});
+// Sign off an over-delivery (PM / superadmin): the goods are already receipted,
+// this records that someone accepted taking more than was ordered.
+$r->post('/delivery-orders/{id}/approve-over', function ($p) {
+    Perm::require("do_approve_over");
+    Csrf::check();
+    $id = (int)$p['id'];
+    do_or_404($id);
+    $err = MatchingService::approveOverDelivery($id, $_POST['note'] ?? '');
+    Response::redirect('/delivery-orders/' . $id . ($err ? '?err=' . rawurlencode($err) : ''));
 });
 $r->post('/delivery-orders/{id}/edit', function ($p) {
     Perm::require("do_confirm");
