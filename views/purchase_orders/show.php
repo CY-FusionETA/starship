@@ -1,7 +1,11 @@
 <?php /** @var array $po @var array $lines @var ?string $error */
 use App\Auth;
+use App\Perm;
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
+// Requesters track their order — quantities, balances, status — without the
+// commercial terms: unit price, line totals, PO total, bills, Xero state.
+$showMoney = Perm::can('view_money');
 $sb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'=>'warn','fully_received'=>'ok','over_received'=>'warn','closed'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>';
 $xflash = $_GET['xero'] ?? null;
 $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connected — nothing was sent. Connect it in Settings.', 'err'=>'Xero push failed — see the error below.'][$xflash] ?? null; ?>
@@ -15,7 +19,8 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
   </div>
   <div>
     <span class="badge <?= ['issued'=>'brand','partially_received'=>'warn','fully_received'=>'ok'][$po['status']] ?? 'muted' ?>"><?= e(str_replace('_',' ',$po['status'])) ?></span>
-    <?php if (!empty($po['xero_po_id'])): ?>
+    <?php if (!$showMoney): /* no Xero state for requesters */ ?>
+    <?php elseif (!empty($po['xero_po_id'])): ?>
       <span class="badge ok" title="Xero PO <?= e($po['xero_po_id']) ?>">✓ Xero synced</span>
     <?php elseif (!empty($po['xero_last_error'])): ?>
       <span class="badge danger">Xero: failed</span>
@@ -34,12 +39,14 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
     <?php endif; ?>
   </div>
 </div>
-<?php if (!empty($po['xero_last_error']) && empty($po['xero_po_id'])): ?>
+<?php if (!empty($po['xero_last_error']) && empty($po['xero_po_id']) && $showMoney): ?>
   <div class="alert" style="margin-top:.4rem"><strong>Xero error:</strong> <?= e($po['xero_last_error']) ?></div>
 <?php endif; ?>
 <div class="card">
   <table>
-    <thead><tr><th>#</th><th>Description</th><th>Ordered</th><th>Received</th><th>Balance</th><th>Unit price</th><th>Line total</th><th>Status</th></tr></thead>
+    <thead><tr><th>#</th><th>Description</th><th>Ordered</th><th>Received</th><th>Balance</th>
+      <?php if ($showMoney): ?><th>Unit price</th><th>Line total</th><?php endif; ?>
+      <th>Status</th></tr></thead>
     <tbody>
     <?php $tot = 0; foreach ($lines as $l): $tot += (float)$l['line_total']; ?>
       <tr>
@@ -48,13 +55,17 @@ $flashMsg = ['ok'=>'Purchase order pushed to Xero.', 'stub'=>'Xero is not connec
         <td><?= rtrim(rtrim(number_format((float)$l['qty_ordered'],2),'0'),'.') ?> <?= e($l['uom']) ?></td>
         <td><?= rtrim(rtrim(number_format((float)$l['qty_received'],2),'0'),'.') ?></td>
         <td><?= rtrim(rtrim(number_format((float)$l['balance_qty'],2),'0'),'.') ?></td>
-        <td><?= $l['unit_price'] !== null ? number_format((float)$l['unit_price'],2) : '—' ?></td>
-        <td><?= $l['line_total'] !== null ? number_format((float)$l['line_total'],2) : '—' ?></td>
+        <?php if ($showMoney): ?>
+          <td><?= $l['unit_price'] !== null ? number_format((float)$l['unit_price'],2) : '—' ?></td>
+          <td><?= $l['line_total'] !== null ? number_format((float)$l['line_total'],2) : '—' ?></td>
+        <?php endif; ?>
         <td><?= $sb($l['line_status']) ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
-    <tfoot><tr><th colspan="6" style="text-align:right">Total (MYR)</th><th><?= number_format($tot,2) ?></th><th></th></tr></tfoot>
+    <?php if ($showMoney): ?>
+      <tfoot><tr><th colspan="6" style="text-align:right">Total (MYR)</th><th><?= number_format($tot,2) ?></th><th></th></tr></tfoot>
+    <?php endif; ?>
   </table>
 </div>
 
@@ -66,8 +77,9 @@ $fullyDone = $fulfil['outstanding'] <= 1e-6 && $fulfil['ordered'] > 0;
 ?>
 <div class="card">
   <div class="dash-sec-h" style="margin-bottom:.7rem">
-    <h2 style="margin:0;font-size:1.05rem">📦 Deliveries &amp; invoices</h2>
-    <span class="muted small"><?= count($dos) ?> DO<?= count($dos) == 1 ? '' : 's' ?> · <?= count($bills) ?> invoice<?= count($bills) == 1 ? '' : 's' ?></span>
+    <h2 style="margin:0;font-size:1.05rem">📦 Deliveries<?= $showMoney ? ' &amp; invoices' : '' ?></h2>
+    <span class="muted small"><?= count($dos) ?> DO<?= count($dos) == 1 ? '' : 's' ?><?= $showMoney
+        ? ' · ' . count($bills) . ' invoice' . (count($bills) == 1 ? '' : 's') : '' ?></span>
   </div>
 
   <div class="po-fulfil">
@@ -99,6 +111,7 @@ $fullyDone = $fulfil['outstanding'] <= 1e-6 && $fulfil['ordered'] > 0;
     <p class="muted small" style="margin:.9rem 0 0">No delivery orders booked against this PO yet.</p>
   <?php endif; ?>
 
+  <?php if ($showMoney): /* invoices are money — requesters don't get this block */ ?>
   <h3 style="margin:1.3rem 0 .4rem;font-size:.98rem">🧾 Invoices</h3>
   <?php if ($bills): ?>
   <table>
@@ -117,6 +130,7 @@ $fullyDone = $fulfil['outstanding'] <= 1e-6 && $fulfil['ordered'] > 0;
   <?php else: ?>
     <p class="muted small" style="margin:0">No invoices recorded against this PO yet — invoice capture is a later phase.</p>
   <?php endif; ?>
+  <?php endif; /* $showMoney */ ?>
 </div>
 
 <?php if (Auth::isAdmin()): ?>

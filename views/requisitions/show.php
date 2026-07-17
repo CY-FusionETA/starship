@@ -6,7 +6,9 @@ use App\Icons;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $hasRemaining = false;
 foreach ($lines as $l) { if ($l['remaining'] > 0.00001) { $hasRemaining = true; break; } }
-$canOrder = in_array($req['status'], ['approved', 'partially_ordered'], true) && $hasRemaining;
+// Raising a PO is a procurement job and the form carries unit prices — a
+// requester sees the approved MR, but not the ordering block.
+$canOrder = in_array($req['status'], ['approved', 'partially_ordered'], true) && $hasRemaining && Perm::can('po_create');
 $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered'=>'warn','fully_ordered'=>'ok','cancelled'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>'; ?>
 
 <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>

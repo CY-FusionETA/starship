@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace App\Repo;
 
 use App\Db;
+use App\Perm;
+use App\Support\Filter;
 
 /**
  * Role-aware, urgency-driven dashboard feeds.
@@ -27,10 +29,25 @@ final class DashboardRepo
     /** Statuses that still need somebody to act. */
     private const OPEN = "('draft','approved','partially_ordered')";
 
+    /**
+     * "AND project_id IN (…)" for the current user, or '' when unscoped.
+     * Every feed and counter goes through this: a dashboard that counted other
+     * projects' requisitions would leak them, and its feeds would link to
+     * records the user can only 404 on.
+     */
+    private static function scope(string $col = 'r.project_id'): array
+    {
+        $c = Filter::projectScope(Perm::projectIds(), $col);
+        return $c === null ? ['', []] : [' AND ' . $c[0], $c[1]];
+    }
+
     /** Shared feed: header row + project + derived priority columns. */
     private static function feed(string $where, array $params, string $order, int $limit): array
     {
         $rank = self::URGENCY_RANK;
+        [$scopeSql, $scopeArgs] = self::scope();
+        $where .= $scopeSql;
+        $params = array_merge($params, $scopeArgs);
         $params[] = $limit;
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code,
@@ -106,25 +123,26 @@ final class DashboardRepo
         );
     }
 
-    /** Headline KPI counters. $userId scopes the personal ones (0 = org-wide). */
+    /** Headline KPI counters, scoped to the user's projects. $userId scopes the personal ones. */
     public static function kpis(int $userId = 0): array
     {
-        $s = fn(string $sql, array $p = []) => (int)Db::scalar($sql, $p);
+        [$sc, $sa] = self::scope('project_id');   // these count straight off requisitions, no alias
+        $s = fn(string $sql, array $p = []) => (int)Db::scalar($sql, array_merge($p, $sa));
         return [
-            'pending'   => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'"),
-            'urgent'    => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'draft' AND urgency LIKE 'ASAP%'"),
-            'ready'     => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'approved'"),
+            'pending'   => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'{$sc}"),
+            'urgent'    => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'draft' AND urgency LIKE 'ASAP%'{$sc}"),
+            'ready'     => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'approved'{$sc}"),
             'overdue'   => $s("SELECT COUNT(*) FROM requisitions WHERE status IN " . self::OPEN . "
                                AND delivery_date IS NOT NULL AND delivery_date != ''
-                               AND date(delivery_date) < date('now','localtime')"),
+                               AND date(delivery_date) < date('now','localtime'){$sc}"),
             'due_week'  => $s("SELECT COUNT(*) FROM requisitions WHERE status IN " . self::OPEN . "
                                AND delivery_date IS NOT NULL AND delivery_date != ''
-                               AND date(delivery_date) BETWEEN date('now','localtime') AND date('now','localtime','+7 days')"),
+                               AND date(delivery_date) BETWEEN date('now','localtime') AND date('now','localtime','+7 days'){$sc}"),
             'avg_wait'  => (float)(Db::scalar("SELECT ROUND(AVG(julianday(date('now','localtime')) - julianday(date(created_at))),1)
-                               FROM requisitions WHERE status = 'draft'") ?? 0),
+                               FROM requisitions WHERE status = 'draft'{$sc}", $sa) ?? 0),
             'my_open'   => $userId > 0
-                ? $s("SELECT COUNT(*) FROM requisitions WHERE created_by = ? AND status IN " . self::OPEN, [$userId])
-                : $s("SELECT COUNT(*) FROM requisitions WHERE status IN " . self::OPEN),
+                ? $s("SELECT COUNT(*) FROM requisitions WHERE created_by = ? AND status IN " . self::OPEN . $sc, [$userId])
+                : $s("SELECT COUNT(*) FROM requisitions WHERE status IN " . self::OPEN . $sc),
         ];
     }
 }
