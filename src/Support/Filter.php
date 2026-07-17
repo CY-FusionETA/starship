@@ -66,4 +66,24 @@ final class Filter
         foreach ($f as $v) { if (trim((string)$v) !== '') return true; }
         return false;
     }
+
+    /**
+     * Restrict a list to the projects the current user may see.
+     *
+     * $ids null  → unscoped (superadmin / finance): no clause.
+     * $ids []    → assigned to nothing: match nothing. Access is granted per
+     *              project, so "no projects" must mean "no records", never "all".
+     *
+     * $extraColumn lets a delivery order fall back to its PO's project when its
+     * own project_id hasn't been resolved yet.
+     */
+    public static function projectScope(?array $ids, string $column, ?string $extraColumn = null): ?array
+    {
+        if ($ids === null) return null;
+        if (!$ids) return ['1 = 0', []];
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $args = array_map('intval', $ids);
+        if ($extraColumn === null) return ["$column IN ($in)", $args];
+        return ["(COALESCE($column, $extraColumn) IN ($in))", $args];
+    }
 }

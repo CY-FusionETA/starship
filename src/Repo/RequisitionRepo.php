@@ -6,6 +6,7 @@ namespace App\Repo;
 use App\Db;
 use App\Auth;
 use App\Storage;
+use App\Perm;
 use App\Support\Filter;
 
 final class RequisitionRepo
@@ -30,6 +31,7 @@ final class RequisitionRepo
     public static function all(array $f = []): array
     {
         [$where, $args] = Filter::build([
+            Filter::projectScope(Perm::projectIds(), 'r.project_id'),
             Filter::search($f['q'] ?? '', ['r.mr_number', 'r.requested_by', 'p.project_code', 'p.name']),
             Filter::equals('r.status', $f['status'] ?? ''),
             Filter::equals('r.project_id', $f['project_id'] ?? ''),
@@ -47,26 +49,41 @@ final class RequisitionRepo
         );
     }
 
-    /** Statuses actually present, for the filter dropdown. */
+    /**
+     * "WHERE project_id IN (…)" for the current user, or '' when unscoped.
+     * $and appends to an existing WHERE instead of starting one.
+     */
+    private static function scope(string $col = 'project_id', bool $and = false): array
+    {
+        $c = Filter::projectScope(Perm::projectIds(), $col);
+        if ($c === null) return ['', []];
+        return [($and ? ' AND ' : ' WHERE ') . $c[0], $c[1]];
+    }
+
+    /** Statuses actually present in what this user can see, for the filter dropdown. */
     public static function statuses(): array
     {
-        return array_column(Db::all("SELECT DISTINCT status FROM requisitions ORDER BY status"), 'status');
+        [$w, $a] = self::scope();
+        return array_column(Db::all("SELECT DISTINCT status FROM requisitions{$w} ORDER BY status", $a), 'status');
     }
 
     public static function count(): int
     {
-        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions");
+        [$w, $a] = self::scope();
+        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions{$w}", $a);
     }
 
-    /** Number of requisitions awaiting superadmin approval. */
+    /** Number of requisitions awaiting approval, within the user's projects. */
     public static function pendingCount(): int
     {
-        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'");
+        [$w, $a] = self::scope('project_id', true);
+        return (int)Db::scalar("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'{$w}", $a);
     }
 
     /** Draft requisitions awaiting approval, newest first, with line count + creator. */
     public static function pending(int $limit = 100): array
     {
+        [$w, $a] = self::scope('r.project_id', true);
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code, u.name AS created_by_name,
                     (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count,
@@ -74,21 +91,23 @@ final class RequisitionRepo
              FROM requisitions r
              JOIN projects p ON p.id = r.project_id
              LEFT JOIN users u ON u.id = r.created_by
-             WHERE r.status = 'draft'
+             WHERE r.status = 'draft'{$w}
              ORDER BY r.created_at DESC LIMIT ?",
-            [$limit]
+            array_merge($a, [$limit])
         );
     }
 
     /** Most recent requisitions of any status (for the dashboard feed). */
     public static function recent(int $limit = 6): array
     {
+        [$w, $a] = self::scope('r.project_id');
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code,
                     (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count
              FROM requisitions r JOIN projects p ON p.id = r.project_id
+             {$w}
              ORDER BY r.created_at DESC LIMIT ?",
-            [$limit]
+            array_merge($a, [$limit])
         );
     }
 

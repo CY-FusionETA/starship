@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Repo;
 
 use App\Db;
+use App\Perm;
 use App\Support\Filter;
 
 final class DeliveryOrderRepo
@@ -11,7 +12,8 @@ final class DeliveryOrderRepo
     public static function find(int $id): ?array
     {
         return Db::one(
-            "SELECT d.*, s.name AS supplier_name, p.project_code, po.po_number
+            "SELECT d.*, s.name AS supplier_name, p.project_code, po.po_number,
+                    po.project_id AS po_project_id
              FROM delivery_orders d
              LEFT JOIN suppliers s ON s.id = d.supplier_id
              LEFT JOIN projects p ON p.id = d.project_id
@@ -28,6 +30,10 @@ final class DeliveryOrderRepo
     public static function all(array $f = []): array
     {
         [$where, $args] = Filter::build([
+            // A DO that hasn't been matched yet has no project of its own, so fall
+            // back to its PO's project. Both null = not yet triaged; those are
+            // handled by unmatchedVisible() below rather than hidden from everyone.
+            self::scopeClause(),
             Filter::search($f['q'] ?? '', [
                 'd.do_number', 's.name', 'po.po_number', 'd.po_reference_raw',
                 'd.project_code_raw', 'd.original_filename',
@@ -49,15 +55,46 @@ final class DeliveryOrderRepo
         );
     }
 
-    /** Statuses actually present, for the filter dropdown. */
+    /**
+     * Project scope for delivery orders, or null when unscoped.
+     *
+     * A DO's project comes from its own project_id, falling back to its PO's.
+     * A DO with neither is one nobody has triaged yet — it can't belong to a
+     * project until someone links it, so whoever does the receiving (pm /
+     * procurement) still needs to see it. A requester never does.
+     */
+    private static function scopeClause(): ?array
+    {
+        $c = Filter::projectScope(Perm::projectIds(), 'd.project_id', 'po.project_id');
+        if ($c === null) return null;
+        if (!Perm::can('do_confirm')) return $c;
+        return ['(' . $c[0] . ' OR (d.project_id IS NULL AND d.purchase_order_id IS NULL))', $c[1]];
+    }
+
+    /** Same scope for the aggregate queries, as a WHERE/AND fragment. */
+    private static function scopeFragment(bool $and = false): array
+    {
+        $c = self::scopeClause();
+        if ($c === null) return ['', []];
+        return [($and ? ' AND ' : ' WHERE ') . $c[0], $c[1]];
+    }
+
+    /** Statuses actually present in what this user can see, for the filter dropdown. */
     public static function statuses(): array
     {
-        return array_column(Db::all("SELECT DISTINCT status FROM delivery_orders ORDER BY status"), 'status');
+        [$w, $a] = self::scopeFragment();
+        return array_column(Db::all(
+            "SELECT DISTINCT d.status FROM delivery_orders d
+             LEFT JOIN purchase_orders po ON po.id = d.purchase_order_id{$w}
+             ORDER BY d.status", $a), 'status');
     }
 
     public static function count(): int
     {
-        return (int)Db::scalar("SELECT COUNT(*) FROM delivery_orders");
+        [$w, $a] = self::scopeFragment();
+        return (int)Db::scalar(
+            "SELECT COUNT(*) FROM delivery_orders d
+             LEFT JOIN purchase_orders po ON po.id = d.purchase_order_id{$w}", $a);
     }
 
     /** Keep a user-supplied/uploaded file name recognisable but harmless. */

@@ -182,6 +182,24 @@ td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
   font-size:.72rem;font-weight:400;max-width:16rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fname-hint .clip-ico{width:12px;height:12px;flex:0 0 auto}
 
+/* ---- Settings > Users & project access ---- */
+.users-table tr.is-off td{opacity:.55}
+.users-table td{vertical-align:middle}
+.user-form .row{margin-bottom:.2rem}
+.role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.5rem;margin:.3rem 0 .2rem}
+.role-opt{display:block;margin:0;border:1.5px solid var(--fe-border);border-radius:var(--radius-btn);
+  padding:.6rem .7rem;cursor:pointer;font-weight:400;transition:border-color .15s var(--ease),background .15s var(--ease)}
+.role-opt:hover{border-color:#c7d2fe;background:#f7f9ff}
+.role-opt.on{border-color:var(--fe-primary-2);background:#f7f9ff}
+.role-opt input{width:auto;margin-right:.35rem}
+.ro-name{font-weight:600;font-size:.88rem}
+.ro-desc{display:block;color:var(--fe-muted);font-size:.75rem;line-height:1.35;margin-top:.15rem}
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.35rem}
+.proj-opt{display:flex;align-items:center;gap:.45rem;margin:0;border:1px solid var(--fe-border);
+  border-radius:var(--radius-btn);padding:.45rem .6rem;cursor:pointer;font-weight:400;font-size:.85rem}
+.proj-opt:hover{border-color:#c7d2fe;background:#f7f9ff}
+.proj-opt input{width:auto;flex:0 0 auto}
+
 /* ---- One-click demo logins ---- */
 .demo-sep{display:flex;align-items:center;gap:.7rem;margin:1.3rem 0 .9rem;color:var(--fe-muted);font-size:.78rem}
 .demo-sep::before,.demo-sep::after{content:"";flex:1;height:1px;background:var(--fe-border)}

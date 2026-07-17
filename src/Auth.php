@@ -30,6 +30,22 @@ final class Auth
         return true;
     }
 
+    /**
+     * Re-read role + is_active from the DB once per request.
+     *
+     * The session caches them at login, so without this a role change or a
+     * deactivation wouldn't take effect until the user next signed in — a
+     * revoked account would keep its access for as long as it stayed logged in.
+     */
+    public static function refresh(): void
+    {
+        if (empty($_SESSION['uid'])) return;
+        $u = Db::one("SELECT role, name, is_active FROM users WHERE id = ?", [(int)$_SESSION['uid']]);
+        if (!$u || (int)$u['is_active'] !== 1) { self::logout(); return; }
+        $_SESSION['role'] = $u['role'];
+        $_SESSION['name'] = $u['name'];
+    }
+
     public static function check(): bool { return !empty($_SESSION['uid']); }
 
     /** Current user's role, or '' if signed out. */
@@ -47,7 +63,7 @@ final class Auth
     /** Human label for the current role (used in the top bar). */
     public static function roleLabel(): string
     {
-        return self::isAdmin() ? 'Superadmin' : (self::role() === 'staff' ? 'Staff' : ucfirst(self::role() ?: 'Guest'));
+        return Perm::label();
     }
 
     public static function user(): ?array

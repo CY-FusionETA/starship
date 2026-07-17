@@ -4,11 +4,11 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 // One-click demo logins. These credentials are public to anyone who opens the
 // page — keep the accounts on demo data only.
 $demoUsers = [
-    // Carmen is role=admin, same as Simon — the app labels both "Superadmin".
-    ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin', 'initials' => 'SC'],
-    ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin', 'initials' => 'CA'],
-    ['email' => 'staff@fusioneta.com',  'name' => 'Staff',  'role' => 'Staff',      'initials' => 'ST'],
-    ['email' => 'mr@fusioneta.com',     'name' => 'MR',     'role' => 'Requester',  'initials' => 'MR'],
+    // Labels track the account's real role — see App\Perm::LABELS.
+    ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin',  'initials' => 'SC'],
+    ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin',  'initials' => 'CA'],
+    ['email' => 'staff@fusioneta.com',  'name' => 'Staff',  'role' => 'Procurement', 'initials' => 'ST'],
+    ['email' => 'mr@fusioneta.com',     'name' => 'MR',     'role' => 'Requester',   'initials' => 'MR'],
 ];
 $demoPassword = 'demo123'; ?>
 <!DOCTYPE html>

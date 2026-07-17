@@ -1,5 +1,6 @@
 <?php /** @var array $req @var array $lines @var array $attachments @var array $suppliers @var ?string $error */
 use App\Auth;
+use App\Perm;
 use App\Csrf;
 use App\Icons;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
@@ -21,7 +22,7 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
   </div>
   <div>
     <span class="badge <?= ['draft'=>'muted','approved'=>'brand','partially_ordered'=>'warn','fully_ordered'=>'ok'][$req['status']] ?? 'muted' ?>" style="font-size:.8rem"><?= e(str_replace('_',' ',$req['status'])) ?></span>
-    <?php if ($req['status'] === 'draft' && Auth::is('requester', 'staff', 'purchaser')): ?>
+    <?php if ($req['status'] === 'draft' && Perm::can('mr_edit')): ?>
       <a class="btn sm ghost" href="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/edit">Edit</a>
     <?php endif; ?>
     <?php if (Auth::isAdmin()): ?>
@@ -30,7 +31,7 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
       </form>
     <?php endif; ?>
     <?php if ($req['status'] === 'draft'): ?>
-      <?php if (Auth::isAdmin()): ?>
+      <?php if (Perm::can('mr_approve')): ?>
         <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/reject" onsubmit="return confirm('Reject this requisition?')" style="display:inline">
           <?= Csrf::field() ?><button class="btn sm ghost-danger">Reject</button>
         </form>
@@ -38,7 +39,7 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
           <?= Csrf::field() ?><button class="btn sm">Approve ✓</button>
         </form>
       <?php else: ?>
-        <span class="badge warn" style="font-size:.8rem">⏳ Awaiting superadmin approval</span>
+        <span class="badge warn" style="font-size:.8rem">⏳ Awaiting PM approval</span>
       <?php endif; ?>
     <?php endif; ?>
   </div>
@@ -67,7 +68,7 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
 
 <?php
 $isDraft   = $req['status'] === 'draft';
-$canAttach = $isDraft && Auth::is('requester', 'staff', 'purchaser', 'admin');
+$canAttach = $isDraft && Perm::can('mr_edit');
 $fsize = function ($b) {
     $b = (int)$b;
     if ($b <= 0) return '';

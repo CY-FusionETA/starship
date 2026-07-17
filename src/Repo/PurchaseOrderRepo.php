@@ -5,6 +5,7 @@ namespace App\Repo;
 
 use App\Db;
 use App\Auth;
+use App\Perm;
 use App\Support\Normalizer;
 use App\Support\Filter;
 use App\Service\Xero\XeroClientFactory;
@@ -31,6 +32,7 @@ final class PurchaseOrderRepo
     public static function all(array $f = []): array
     {
         $clauses = [
+            Filter::projectScope(Perm::projectIds(), 'po.project_id'),
             Filter::search($f['q'] ?? '', ['po.po_number', 's.name', 'p.project_code', 'p.name']),
             Filter::equals('po.status', $f['status'] ?? ''),
             Filter::equals('po.supplier_id', $f['supplier_id'] ?? ''),
@@ -54,15 +56,24 @@ final class PurchaseOrderRepo
         );
     }
 
-    /** Statuses actually present, for the filter dropdown. */
+    /** "WHERE project_id IN (…)" for the current user, or '' when unscoped. */
+    private static function scope(string $col = 'project_id'): array
+    {
+        $c = Filter::projectScope(Perm::projectIds(), $col);
+        return $c === null ? ['', []] : [' WHERE ' . $c[0], $c[1]];
+    }
+
+    /** Statuses actually present in what this user can see, for the filter dropdown. */
     public static function statuses(): array
     {
-        return array_column(Db::all("SELECT DISTINCT status FROM purchase_orders ORDER BY status"), 'status');
+        [$w, $a] = self::scope();
+        return array_column(Db::all("SELECT DISTINCT status FROM purchase_orders{$w} ORDER BY status", $a), 'status');
     }
 
     public static function count(): int
     {
-        return (int)Db::scalar("SELECT COUNT(*) FROM purchase_orders");
+        [$w, $a] = self::scope();
+        return (int)Db::scalar("SELECT COUNT(*) FROM purchase_orders{$w}", $a);
     }
 
     public static function lines(int $poId): array
@@ -81,15 +92,19 @@ final class PurchaseOrderRepo
     }
 
     /** POs still open to receiving, for the DO link dropdown. */
+    /** Open POs the current user may link a delivery to — scoped to their projects. */
     public static function openForSelect(): array
     {
+        $c = Filter::projectScope(Perm::projectIds(), 'po.project_id');
+        [$and, $args] = $c === null ? ['', []] : [' AND ' . $c[0], $c[1]];
         return Db::all(
             "SELECT po.id, po.po_number, po.status, s.name AS supplier_name, p.project_code
              FROM purchase_orders po
              JOIN suppliers s ON s.id = po.supplier_id
              JOIN projects p ON p.id = po.project_id
-             WHERE po.status IN ('issued','partially_received')
-             ORDER BY po.created_at DESC"
+             WHERE po.status IN ('issued','partially_received'){$and}
+             ORDER BY po.created_at DESC",
+            $args
         );
     }
 

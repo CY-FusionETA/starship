@@ -5,9 +5,11 @@ require __DIR__ . '/src/bootstrap.php';
 
 use App\Auth;
 use App\Csrf;
+use App\Perm;
 use App\Response;
 use App\Router;
 use App\Settings;
+use App\Repo\UserRepo;
 use App\Service\Xero\XeroOAuth;
 use App\Service\Xero\XeroSync;
 use App\Repo\WaSenderRepo;
@@ -44,7 +46,31 @@ function filters_from_query(array $keys): array {
     return $out;
 }
 
+/**
+ * Fetch-or-404 helpers. Every by-id lookup goes through these so a record
+ * outside your projects is indistinguishable from one that doesn't exist —
+ * a 403 would confirm it's there. Applies to reads AND writes: without the
+ * check, a PM of project A could approve project B's requisition by id.
+ */
+function mr_or_404(int $id): array {
+    $req = RequisitionRepo::find($id);
+    if (!$req || !Perm::canSeeProject((int)$req['project_id'])) Response::notFound();
+    return $req;
+}
+function po_or_404(int $id): array {
+    $po = PurchaseOrderRepo::find($id);
+    if (!$po || !Perm::canSeeProject((int)$po['project_id'])) Response::notFound();
+    return $po;
+}
+function do_or_404(int $id): array {
+    $do = DeliveryOrderRepo::find($id);
+    if (!$do || !Perm::canSeeDelivery($do)) Response::notFound();
+    return $do;
+}
+
 Auth::start();
+// Pick up role changes / deactivation immediately, rather than at next login.
+Auth::refresh();
 $r = new Router();
 
 // --- Auth -----------------------------------------------------------
@@ -77,7 +103,7 @@ $r->get('/', function () {
 
 // --- Approvals (superadmin inbox: incoming requisition requests) -----
 $r->get('/approvals', function () {
-    Auth::requireRole('admin');
+    Perm::require("mr_approve");
     Response::view('approvals/index', ['pending' => RequisitionRepo::pending(100)], 'Approvals');
 });
 
@@ -117,17 +143,17 @@ $r->get('/catalogue/search.json', function () {
     ], $items)]);
 });
 $r->get('/catalogue/new', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Response::view('catalogue/form', ['item' => null], 'New item');
 });
 $r->get('/catalogue/{id}/edit', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     $item = CatalogueRepo::find((int)$p['id']);
     if (!$item) Response::notFound();
     Response::view('catalogue/form', ['item' => $item], 'Edit item');
 });
 $r->post('/catalogue/save', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     $savedId = CatalogueRepo::save($_POST, $id);
@@ -138,7 +164,7 @@ $r->post('/catalogue/save', function () {
 // Inline quick-add from the requisition builder — creates a catalogue item and
 // returns it as JSON so it can be dropped straight into the cart. Staff & up.
 $r->post('/catalogue/quick-add.json', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Csrf::check();
     $name = trim($_POST['name'] ?? '');
     if ($name === '') Response::json(['error' => 'Product name is required.'], 422);
@@ -195,17 +221,17 @@ $r->post('/suppliers/xero-sync', function () {
     }
 });
 $r->get('/suppliers/new', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Response::view('suppliers/form', ['supplier' => null], 'New supplier');
 });
 $r->get('/suppliers/{id}/edit', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     $s = SupplierRepo::find((int)$p['id']);
     if (!$s) Response::notFound();
     Response::view('suppliers/form', ['supplier' => $s], 'Edit supplier');
 });
 $r->post('/suppliers/save', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     SupplierRepo::save($_POST, $id);
@@ -216,7 +242,7 @@ $r->post('/suppliers/save', function () {
 $r->get('/projects', function () {
     Auth::require();
     Response::view('projects/index', [
-        'projects'      => ProjectRepo::all(),
+        'projects'      => ProjectRepo::allForUser(),
         'xeroConnected' => XeroOAuth::isConnected(),
         'notice'        => $_GET['ok'] ?? null,
         'error'         => $_GET['err'] ?? null,
@@ -234,17 +260,17 @@ $r->post('/projects/xero-sync', function () {
     }
 });
 $r->get('/projects/new', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Response::view('projects/form', ['project' => null], 'New project');
 });
 $r->get('/projects/{id}/edit', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     $proj = ProjectRepo::find((int)$p['id']);
     if (!$proj) Response::notFound();
     Response::view('projects/form', ['project' => $proj], 'Edit project');
 });
 $r->post('/projects/save', function () {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("master_edit");
     Csrf::check();
     $id = ($_POST['id'] ?? '') !== '' ? (int)$_POST['id'] : null;
     ProjectRepo::save($_POST, $id);
@@ -264,18 +290,22 @@ $r->get('/requisitions', function () {
     Response::view('requisitions/index', [
         'requisitions' => RequisitionRepo::all($f),
         'filters'      => $f,
-        'projects'     => ProjectRepo::all(),
+        'projects'     => ProjectRepo::allForUser(),
         'statuses'     => RequisitionRepo::statuses(),
         'total'        => RequisitionRepo::count(),
     ], 'Requisitions');
 });
 $r->get('/requisitions/new', function () {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
-    Response::view('requisitions/form', ['projects' => ProjectRepo::all(), 'catalogue' => CatalogueRepo::all()], 'New requisition');
+    Perm::require("mr_create");
+    Response::view('requisitions/form', ['projects' => ProjectRepo::allForUser(), 'catalogue' => CatalogueRepo::all()], 'New requisition');
 });
 $r->post('/requisitions/save', function () {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Perm::require("mr_create");
     Csrf::check();
+    // The picker only offers your projects, but the field is still a POST value.
+    if (!Perm::canSeeProject((int)($_POST['project_id'] ?? 0))) {
+        Response::redirect('/requisitions/new?err=' . rawurlencode('Pick a project you are assigned to.'));
+    }
     $id = RequisitionRepo::create($_POST, $_POST['lines'] ?? []);
     // Quotations ride along with the form — a rejected file never blocks the MR itself.
     $err = '';
@@ -287,8 +317,7 @@ $r->post('/requisitions/save', function () {
 });
 $r->get('/requisitions/{id}', function ($p) {
     Auth::require();
-    $req = RequisitionRepo::find((int)$p['id']);
-    if (!$req) Response::notFound();
+    $req = mr_or_404((int)$p['id']);
     Response::view('requisitions/show', [
         'req'         => $req,
         'lines'       => RequisitionRepo::lines((int)$p['id']),
@@ -299,11 +328,10 @@ $r->get('/requisitions/{id}', function ($p) {
 });
 // Quotation attachments — add while the MR is still a draft, view at any time.
 $r->post('/requisitions/{id}/attachments', function ($p) {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Perm::require("mr_edit");
     Csrf::check();
     $id = (int)$p['id'];
-    $req = RequisitionRepo::find($id);
-    if (!$req) Response::notFound();
+    $req = mr_or_404($id);
     if ($req['status'] !== 'draft') {
         Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Quotations can only be attached while the requisition is a draft.'));
     }
@@ -315,17 +343,18 @@ $r->post('/requisitions/{id}/attachments', function ($p) {
 });
 $r->get('/requisitions/{id}/attachments/{aid}/file', function ($p) {
     Auth::require();
+    mr_or_404((int)$p['id']);   // quotations follow their requisition's project
     $a = RequisitionRepo::findAttachment((int)$p['aid']);
     if (!$a || (int)$a['requisition_id'] !== (int)$p['id']) Response::notFound();
     Storage::stream($a['file_path'], $a['original_filename']);
 });
 $r->post('/requisitions/{id}/attachments/{aid}/delete', function ($p) {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Perm::require("mr_edit");
     Csrf::check();
     $id = (int)$p['id'];
-    $req = RequisitionRepo::find($id);
+    $req = mr_or_404($id);
     $a   = RequisitionRepo::findAttachment((int)$p['aid']);
-    if (!$req || !$a || (int)$a['requisition_id'] !== $id) Response::notFound();
+    if (!$a || (int)$a['requisition_id'] !== $id) Response::notFound();
     if ($req['status'] !== 'draft' && !Auth::isAdmin()) {
         Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Quotations can only be removed while the requisition is a draft.'));
     }
@@ -333,21 +362,21 @@ $r->post('/requisitions/{id}/attachments/{aid}/delete', function ($p) {
     Response::redirect('/requisitions/' . $id);
 });
 $r->post('/requisitions/{id}/approve', function ($p) {
-    Auth::requireRole('admin'); // superadmin approval gate
+    Perm::require("mr_approve");
     Csrf::check();
     RequisitionRepo::approve((int)$p['id']);
     if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
     Response::redirect('/requisitions/' . (int)$p['id']);
 });
 $r->post('/requisitions/{id}/reject', function ($p) {
-    Auth::requireRole('admin');
+    Perm::require("mr_approve");
     Csrf::check();
     RequisitionRepo::reject((int)$p['id']);
     if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
     Response::redirect('/requisitions/' . (int)$p['id']);
 });
 $r->post('/requisitions/{id}/create-po', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'admin');
+    Perm::require("po_create");
     Csrf::check();
     $reqId = (int)$p['id'];
     $poNumber = trim($_POST['po_number'] ?? '');
@@ -370,12 +399,11 @@ $r->post('/requisitions/{id}/create-po', function ($p) {
     Response::redirect('/purchase-orders/' . $poId);
 });
 $r->get('/requisitions/{id}/edit', function ($p) {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
-    $req = RequisitionRepo::find((int)$p['id']);
-    if (!$req) Response::notFound();
+    Perm::require("mr_edit");
+    $req = mr_or_404((int)$p['id']);
     if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . (int)$p['id'] . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
     Response::view('requisitions/form', [
-        'projects'    => ProjectRepo::all(),
+        'projects'    => ProjectRepo::allForUser(),
         'catalogue'   => CatalogueRepo::all(),
         'req'         => $req,
         'lines'       => RequisitionRepo::lines((int)$p['id']),
@@ -383,12 +411,15 @@ $r->get('/requisitions/{id}/edit', function ($p) {
     ], 'Edit MR ' . $req['mr_number']);
 });
 $r->post('/requisitions/{id}/update', function ($p) {
-    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Perm::require("mr_edit");
     Csrf::check();
     $id = (int)$p['id'];
-    $req = RequisitionRepo::find($id);
-    if (!$req) Response::notFound();
+    $req = mr_or_404($id);
     if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
+    // Can't move a requisition into a project you don't have.
+    if (!Perm::canSeeProject((int)($_POST['project_id'] ?? 0))) {
+        Response::redirect('/requisitions/' . $id . '/edit?err=' . rawurlencode('Pick a project you are assigned to.'));
+    }
     RequisitionRepo::update($id, $_POST, $_POST['lines'] ?? []);
     $err = '';
     if (!empty($_FILES['quotations']['name'][0])) {
@@ -413,15 +444,14 @@ $r->get('/purchase-orders', function () {
         'pos'       => PurchaseOrderRepo::all($f),
         'filters'   => $f,
         'suppliers' => SupplierRepo::all(),
-        'projects'  => ProjectRepo::all(),
+        'projects'  => ProjectRepo::allForUser(),
         'statuses'  => PurchaseOrderRepo::statuses(),
         'total'     => PurchaseOrderRepo::count(),
     ], 'Purchase Orders');
 });
 $r->get('/purchase-orders/{id}', function ($p) {
     Auth::require();
-    $po = PurchaseOrderRepo::find((int)$p['id']);
-    if (!$po) Response::notFound();
+    $po = po_or_404((int)$p['id']);
     $pid = (int)$p['id'];
     Response::view('purchase_orders/show', [
         'po'     => $po,
@@ -434,7 +464,7 @@ $r->get('/purchase-orders/{id}', function ($p) {
 });
 // Manual Xero push / retry (superadmin) — for POs raised while Xero was down or disconnected.
 $r->post('/purchase-orders/{id}/xero-sync', function ($p) {
-    Auth::requireRole('admin');
+    Perm::require("po_xero_sync");
     Csrf::check();
     $res = PurchaseOrderRepo::syncToXero((int)$p['id']);
     $q = !empty($res['xero_po_id']) ? 'ok' : (!empty($res['stubbed']) ? 'stub' : 'err');
@@ -468,7 +498,7 @@ $r->get('/delivery-orders', function () {
     ], 'Delivery Orders');
 });
 $r->get('/delivery-orders/new', function () {
-    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Perm::require("do_capture");
     Response::view('delivery_orders/new', [
         'suppliers' => SupplierRepo::all(),
         'openPos'   => PurchaseOrderRepo::openForSelect(),
@@ -476,7 +506,7 @@ $r->get('/delivery-orders/new', function () {
     ], 'Capture delivery order');
 });
 $r->post('/delivery-orders/save', function () {
-    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Perm::require("do_capture");
     Csrf::check();
     if (empty($_FILES['image']['tmp_name']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
         Response::redirect('/delivery-orders/new?err=' . rawurlencode('Please attach the signed DO image.'));
@@ -545,14 +575,12 @@ $r->post('/delivery-orders/save', function () {
 });
 $r->get('/delivery-orders/{id}/image', function ($p) {
     Auth::require();
-    $do = DeliveryOrderRepo::find((int)$p['id']);
-    if (!$do) Response::notFound();
+    $do = do_or_404((int)$p['id']);
     Storage::stream($do['image_path'], $do['original_filename'] ?? null);
 });
 $r->get('/delivery-orders/{id}', function ($p) {
     Auth::require();
-    $do = DeliveryOrderRepo::find((int)$p['id']);
-    if (!$do) Response::notFound();
+    $do = do_or_404((int)$p['id']);
     $poId = (int)($do['purchase_order_id'] ?? 0);
     $poLines = $poId ? PurchaseOrderRepo::openLines($poId) : [];
     Response::view('delivery_orders/review', [
@@ -565,7 +593,7 @@ $r->get('/delivery-orders/{id}', function ($p) {
     ], 'DO ' . ($do['do_number'] ?: $p['id']));
 });
 $r->post('/delivery-orders/{id}/relink', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Perm::require("do_confirm");
     Csrf::check();
     $poId = (int)($_POST['purchase_order_id'] ?? 0);
     DeliveryOrderRepo::setHeader((int)$p['id'], ['purchase_order_id' => $poId ?: null, 'project_id' => null, 'supplier_id' => null]);
@@ -573,13 +601,13 @@ $r->post('/delivery-orders/{id}/relink', function ($p) {
     Response::redirect('/delivery-orders/' . (int)$p['id']);
 });
 $r->post('/delivery-orders/{id}/confirm', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Perm::require("do_confirm");
     Csrf::check();
     MatchingService::commit((int)$p['id'], $_POST['line'] ?? []);
     Response::redirect('/delivery-orders/' . (int)$p['id']);
 });
 $r->post('/delivery-orders/{id}/edit', function ($p) {
-    Auth::requireRole('staff', 'purchaser', 'ap', 'admin');
+    Perm::require("do_confirm");
     Csrf::check();
     DeliveryOrderRepo::editHeader((int)$p['id'], $_POST);
     Response::redirect('/delivery-orders/' . (int)$p['id']);
@@ -614,6 +642,10 @@ $r->get('/settings', function () {
         'wz_number'     => WazzupClient::number(),
         'wz_webhook'    => WazzupIntake::webhookUrl(),
         'senders'       => WaSenderRepo::all(),
+        'users'         => UserRepo::all(),
+        'allProjects'   => ProjectRepo::all(),
+        'editUser'      => isset($_GET['user']) ? UserRepo::find((int)$_GET['user']) : null,
+        'editProjects'  => isset($_GET['user']) ? UserRepo::projectIds((int)$_GET['user']) : [],
         'notice'  => $_GET['ok'] ?? null,
         'error'   => $_GET['err'] ?? null,
     ], 'Settings');
@@ -690,6 +722,32 @@ $r->post('/settings/senders/{id}/delete', function ($p) {
     Csrf::check();
     WaSenderRepo::delete((int)$p['id']);
     Response::redirect('/settings?ok=' . rawurlencode('Number removed.') . '#wazzup');
+});
+
+// --- Users (superadmin) ---------------------------------------------
+// Accounts + which projects each one may see. A user with no projects sees no
+// records at all — access is granted per project, never by default.
+$r->post('/settings/users/add', function () {
+    Auth::requireRole('admin');
+    Csrf::check();
+    [$id, $err] = UserRepo::create($_POST, $_POST['projects'] ?? []);
+    if ($err) Response::redirect('/settings?err=' . rawurlencode($err) . '#users');
+    Response::redirect('/settings?ok=' . rawurlencode('User ' . trim($_POST['name'] ?? '') . ' created.') . '#users');
+});
+$r->post('/settings/users/{id}/save', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $err = UserRepo::update((int)$p['id'], $_POST, $_POST['projects'] ?? []);
+    if ($err) Response::redirect('/settings?user=' . (int)$p['id'] . '&err=' . rawurlencode($err) . '#users');
+    Response::redirect('/settings?ok=' . rawurlencode('User updated.') . '#users');
+});
+$r->post('/settings/users/{id}/active', function ($p) {
+    Auth::requireRole('admin');
+    Csrf::check();
+    $active = !empty($_POST['active']);
+    $err = UserRepo::setActive((int)$p['id'], $active);
+    if ($err) Response::redirect('/settings?err=' . rawurlencode($err) . '#users');
+    Response::redirect('/settings?ok=' . rawurlencode($active ? 'User reactivated.' : 'User deactivated — they are signed out immediately.') . '#users');
 });
 
 $r->dispatch();

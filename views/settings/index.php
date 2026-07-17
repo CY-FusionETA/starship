@@ -176,6 +176,105 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
     </form>
   </div>
 </div>
+
+<!-- ------------------------------- Users ------------------------------- -->
+<div class="card" id="users">
+  <h2 style="margin-top:0">Users &amp; project access</h2>
+  <p class="muted small" style="margin-top:0">
+    A user sees requisitions, purchase orders and delivery orders <strong>only for the projects you assign them</strong>.
+    Superadmin and Finance see every project.
+  </p>
+
+  <table class="users-table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Projects</th><th>Last sign-in</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($users as $u): $isSelf = (int)$u['id'] === (int)\App\Auth::id(); ?>
+      <tr class="<?= $u['is_active'] ? '' : 'is-off' ?>">
+        <td><strong><?= e($u['name']) ?></strong><?= $isSelf ? ' <span class="badge muted">you</span>' : '' ?>
+          <?= $u['is_active'] ? '' : ' <span class="badge muted">deactivated</span>' ?></td>
+        <td class="muted small"><?= e($u['email']) ?></td>
+        <td><span class="badge <?= $u['role'] === 'admin' ? 'brand' : 'muted' ?>"><?= e(\App\Perm::label($u['role'])) ?></span></td>
+        <td class="small">
+          <?php if (\App\Perm::seesAllProjects($u['role'])): ?>
+            <span class="muted">all projects</span>
+          <?php elseif (!$u['projects']): ?>
+            <span class="badge warn">none — sees nothing</span>
+          <?php else: ?>
+            <?php foreach ($u['projects'] as $pr): ?><span class="badge brand"><?= e($pr['project_code']) ?></span> <?php endforeach; ?>
+          <?php endif; ?>
+        </td>
+        <td class="muted small"><?= e($u['last_login_at'] ?: 'never') ?></td>
+        <td style="text-align:right;white-space:nowrap">
+          <a class="btn sm secondary" href="<?= e($base) ?>/settings?user=<?= (int)$u['id'] ?>#users">Edit</a>
+          <?php if (!$isSelf): ?>
+            <form method="post" action="<?= e($base) ?>/settings/users/<?= (int)$u['id'] ?>/active"
+                  onsubmit="return confirm('<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> <?= e($u['name']) ?>?')" style="display:inline">
+              <?= Csrf::field() ?>
+              <input type="hidden" name="active" value="<?= $u['is_active'] ? '' : '1' ?>">
+              <button class="btn sm <?= $u['is_active'] ? 'ghost-danger' : 'ghost' ?>"><?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?></button>
+            </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+
+  <?php
+    $ed = $editUser ?? null;
+    $formAction = $ed ? "/settings/users/{$ed['id']}/save" : '/settings/users/add';
+  ?>
+  <h3 style="margin:1.4rem 0 .5rem"><?= $ed ? 'Edit ' . e($ed['name']) : 'Add a user' ?></h3>
+  <form method="post" action="<?= e($base . $formAction) ?>" class="user-form">
+    <?= Csrf::field() ?>
+    <div class="row">
+      <div><label>Name *</label><input name="name" required value="<?= e($ed['name'] ?? '') ?>" placeholder="Siti Rahman"></div>
+      <div><label>Email *</label>
+        <?php if ($ed): ?>
+          <input value="<?= e($ed['email']) ?>" disabled title="Email can't be changed — deactivate and re-create instead.">
+        <?php else: ?>
+          <input name="email" type="email" required placeholder="siti@fusioneta.com">
+        <?php endif; ?>
+      </div>
+      <div><label>Password <?= $ed ? '<span class="muted small">(blank = unchanged)</span>' : '*' ?></label>
+        <input name="password" type="text" autocomplete="new-password" <?= $ed ? '' : 'required' ?>
+               placeholder="<?= $ed ? 'leave blank to keep' : 'min 8 characters' ?>"></div>
+    </div>
+    <label>Role</label>
+    <div class="role-grid">
+      <?php foreach (\App\Perm::ROLES as $roleKey): $checked = ($ed['role'] ?? 'requester') === $roleKey; ?>
+        <label class="role-opt<?= $checked ? ' on' : '' ?>">
+          <input type="radio" name="role" value="<?= e($roleKey) ?>" <?= $checked ? 'checked' : '' ?>
+                 onchange="syncRole()" data-all="<?= \App\Perm::seesAllProjects($roleKey) ? '1' : '' ?>">
+          <span class="ro-name"><?= e(\App\Perm::LABELS[$roleKey]) ?></span>
+          <span class="ro-desc"><?= e(\App\Perm::DESCRIPTIONS[$roleKey]) ?></span>
+        </label>
+      <?php endforeach; ?>
+    </div>
+
+    <div id="projPick">
+      <label style="margin-top:1rem">Projects this user can see</label>
+      <p class="muted small" style="margin:0 0 .4rem">Tick every project they work on — most people are on more than one.</p>
+      <div class="proj-grid">
+        <?php if (!$allProjects): ?>
+          <p class="muted small">No projects yet — create one under Projects first.</p>
+        <?php else: foreach ($allProjects as $pr): ?>
+          <label class="proj-opt">
+            <input type="checkbox" name="projects[]" value="<?= (int)$pr['id'] ?>"
+                   <?= in_array((int)$pr['id'], $editProjects ?? [], true) ? 'checked' : '' ?>>
+            <span><span class="badge brand"><?= e($pr['project_code']) ?></span> <?= e($pr['name']) ?></span>
+          </label>
+        <?php endforeach; endif; ?>
+      </div>
+    </div>
+    <p class="muted small" id="projAllNote" hidden>This role sees every project, so there's nothing to assign.</p>
+
+    <div style="margin-top:1rem;display:flex;gap:.6rem">
+      <button class="btn"><?= $ed ? 'Save changes' : '+ Create user' ?></button>
+      <?php if ($ed): ?><a class="btn secondary" href="<?= e($base) ?>/settings#users">Cancel</a><?php endif; ?>
+    </div>
+  </form>
+</div>
 </div>
 
 <script>
@@ -185,4 +284,15 @@ function copyEl(id,btn){
   setTimeout(()=>btn.textContent=t,1200);
 }
 function copyRedir(){ copyEl('redir', event.target); }
+
+// Superadmin/Finance see every project, so hide the picker for those roles
+// rather than let someone tick boxes that would be ignored on save.
+function syncRole(){
+  const on = document.querySelector('.role-opt input:checked');
+  const seesAll = on && on.dataset.all === '1';
+  document.getElementById('projPick').hidden = !!seesAll;
+  document.getElementById('projAllNote').hidden = !seesAll;
+  document.querySelectorAll('.role-opt').forEach(l => l.classList.toggle('on', l.contains(on)));
+}
+syncRole();
 </script>
