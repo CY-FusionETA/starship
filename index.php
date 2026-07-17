@@ -263,18 +263,60 @@ $r->post('/requisitions/save', function () {
     Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
     Csrf::check();
     $id = RequisitionRepo::create($_POST, $_POST['lines'] ?? []);
-    Response::redirect('/requisitions/' . $id);
+    // Quotations ride along with the form — a rejected file never blocks the MR itself.
+    $err = '';
+    if (!empty($_FILES['quotations']['name'][0])) {
+        [, $errors] = RequisitionRepo::attachUploads($id, $_FILES['quotations']);
+        if ($errors) $err = '?err=' . rawurlencode(implode(' ', $errors));
+    }
+    Response::redirect('/requisitions/' . $id . $err);
 });
 $r->get('/requisitions/{id}', function ($p) {
     Auth::require();
     $req = RequisitionRepo::find((int)$p['id']);
     if (!$req) Response::notFound();
     Response::view('requisitions/show', [
-        'req'       => $req,
-        'lines'     => RequisitionRepo::lines((int)$p['id']),
-        'suppliers' => SupplierRepo::all(),
-        'error'     => $_GET['err'] ?? null,
+        'req'         => $req,
+        'lines'       => RequisitionRepo::lines((int)$p['id']),
+        'attachments' => RequisitionRepo::attachments((int)$p['id']),
+        'suppliers'   => SupplierRepo::all(),
+        'error'       => $_GET['err'] ?? null,
     ], 'MR ' . $req['mr_number']);
+});
+// Quotation attachments — add while the MR is still a draft, view at any time.
+$r->post('/requisitions/{id}/attachments', function ($p) {
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Csrf::check();
+    $id = (int)$p['id'];
+    $req = RequisitionRepo::find($id);
+    if (!$req) Response::notFound();
+    if ($req['status'] !== 'draft') {
+        Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Quotations can only be attached while the requisition is a draft.'));
+    }
+    if (empty($_FILES['quotations']['name'][0])) {
+        Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Choose at least one file to attach.'));
+    }
+    [, $errors] = RequisitionRepo::attachUploads($id, $_FILES['quotations']);
+    Response::redirect('/requisitions/' . $id . ($errors ? '?err=' . rawurlencode(implode(' ', $errors)) : ''));
+});
+$r->get('/requisitions/{id}/attachments/{aid}/file', function ($p) {
+    Auth::require();
+    $a = RequisitionRepo::findAttachment((int)$p['aid']);
+    if (!$a || (int)$a['requisition_id'] !== (int)$p['id']) Response::notFound();
+    Storage::stream($a['file_path'], $a['original_filename']);
+});
+$r->post('/requisitions/{id}/attachments/{aid}/delete', function ($p) {
+    Auth::requireRole('requester', 'staff', 'purchaser', 'admin');
+    Csrf::check();
+    $id = (int)$p['id'];
+    $req = RequisitionRepo::find($id);
+    $a   = RequisitionRepo::findAttachment((int)$p['aid']);
+    if (!$req || !$a || (int)$a['requisition_id'] !== $id) Response::notFound();
+    if ($req['status'] !== 'draft' && !Auth::isAdmin()) {
+        Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Quotations can only be removed while the requisition is a draft.'));
+    }
+    RequisitionRepo::deleteAttachment((int)$p['aid']);
+    Response::redirect('/requisitions/' . $id);
 });
 $r->post('/requisitions/{id}/approve', function ($p) {
     Auth::requireRole('admin'); // superadmin approval gate
@@ -319,10 +361,11 @@ $r->get('/requisitions/{id}/edit', function ($p) {
     if (!$req) Response::notFound();
     if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . (int)$p['id'] . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
     Response::view('requisitions/form', [
-        'projects' => ProjectRepo::all(),
-        'catalogue' => CatalogueRepo::all(),
-        'req'      => $req,
-        'lines'    => RequisitionRepo::lines((int)$p['id']),
+        'projects'    => ProjectRepo::all(),
+        'catalogue'   => CatalogueRepo::all(),
+        'req'         => $req,
+        'lines'       => RequisitionRepo::lines((int)$p['id']),
+        'attachments' => RequisitionRepo::attachments((int)$p['id']),
     ], 'Edit MR ' . $req['mr_number']);
 });
 $r->post('/requisitions/{id}/update', function ($p) {
@@ -333,7 +376,12 @@ $r->post('/requisitions/{id}/update', function ($p) {
     if (!$req) Response::notFound();
     if ($req['status'] !== 'draft') Response::redirect('/requisitions/' . $id . '?err=' . rawurlencode('Only draft requisitions can be edited.'));
     RequisitionRepo::update($id, $_POST, $_POST['lines'] ?? []);
-    Response::redirect('/requisitions/' . $id);
+    $err = '';
+    if (!empty($_FILES['quotations']['name'][0])) {
+        [, $errors] = RequisitionRepo::attachUploads($id, $_FILES['quotations']);
+        if ($errors) $err = '?err=' . rawurlencode(implode(' ', $errors));
+    }
+    Response::redirect('/requisitions/' . $id . $err);
 });
 $r->post('/requisitions/{id}/delete', function ($p) {
     Auth::requireRole('admin');
@@ -421,6 +469,7 @@ $r->post('/delivery-orders/save', function () {
 
     $header = $_POST;
     $header['image_path'] = $path;
+    $header['original_filename'] = basename(str_replace('\\', '/', (string)$_FILES['image']['name']));
     $lines = [];
 
     if ($ocr) {
@@ -469,7 +518,7 @@ $r->get('/delivery-orders/{id}/image', function ($p) {
     Auth::require();
     $do = DeliveryOrderRepo::find((int)$p['id']);
     if (!$do) Response::notFound();
-    Storage::stream($do['image_path']);
+    Storage::stream($do['image_path'], $do['original_filename'] ?? null);
 });
 $r->get('/delivery-orders/{id}', function ($p) {
     Auth::require();

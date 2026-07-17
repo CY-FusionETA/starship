@@ -1,4 +1,4 @@
-<?php /** @var array $projects @var ?array $req @var ?array $lines */
+<?php /** @var array $projects @var ?array $req @var ?array $lines @var ?array $attachments */
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $editing = !empty($req);
@@ -23,8 +23,19 @@ if ($editing) {
 <h1 style="margin-bottom:.2rem"><?= $editing ? 'Edit Material Requisition' : 'New Material Requisition' ?></h1>
 <p class="muted small" style="margin-top:0">Form GE(S)-PU-F01/1 — search the catalogue and add parts to the requisition.</p>
 
-<form id="mrForm" method="post" action="<?= e($base . $action) ?>">
+<form id="mrForm" method="post" action="<?= e($base . $action) ?>" enctype="multipart/form-data">
   <?= Csrf::field() ?>
+
+  <div class="steps" role="tablist">
+    <button type="button" class="step active" id="tabItems" role="tab" aria-selected="true" aria-controls="paneItems" onclick="showStep('items')">
+      <span class="step-n">1</span> Items <span class="badge muted" id="stepLineCount">0</span>
+    </button>
+    <button type="button" class="step" id="tabQuotes" role="tab" aria-selected="false" aria-controls="paneQuotes" onclick="showStep('quotes')">
+      <span class="step-n">2</span> Quotations <span class="badge muted" id="stepQuoteCount">0</span>
+    </button>
+  </div>
+
+  <div id="paneItems" role="tabpanel" aria-labelledby="tabItems">
   <div class="card">
     <div class="mr-fields">
       <div class="row">
@@ -85,8 +96,41 @@ if ($editing) {
       <div class="cart-foot">
         <div class="cart-total"><span class="muted">Estimated value</span><span class="v" id="total">RM 0.00</span></div>
         <div id="lineInputs"></div>
-        <button class="btn" id="raise" style="width:100%" disabled><?= $editing ? 'Save changes →' : 'Raise requisition →' ?></button>
+        <button type="button" class="btn" id="raise" style="width:100%" disabled onclick="showStep('quotes')">Next: quotations →</button>
       </div>
+    </div>
+  </div>
+  </div><!-- /paneItems -->
+
+  <div id="paneQuotes" role="tabpanel" aria-labelledby="tabQuotes" hidden>
+    <div class="card">
+      <h3 style="margin-top:0">Quotations <span class="muted small" style="font-weight:400">— optional, but the PM approves faster with one attached</span></h3>
+      <?php $already = $editing ? ($attachments ?? []) : []; if ($already): ?>
+        <ul class="attach-list" style="margin-top:0">
+          <?php foreach ($already as $a): ?>
+            <li class="attach-row">
+              <span class="clip"><?= \App\Icons::svg('paperclip', 'clip-ico') ?></span>
+              <a class="fn" href="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments/<?= (int)$a['id'] ?>/file" target="_blank"><?= e($a['original_filename']) ?></a>
+              <span class="sz muted small">attached</span>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+        <p class="muted small" style="margin:.2rem 0 .8rem">Already attached — remove them from the requisition page. Anything you add below joins them.</p>
+      <?php endif; ?>
+      <label class="dropzone" id="dropzone" for="quotes">
+        <span class="dz-clip"><?= \App\Icons::svg('paperclip', 'clip-ico') ?></span>
+        <span class="dz-main">Drop quotation files here, or <span class="dz-link">browse</span></span>
+        <span class="dz-sub">PDF, JPG, PNG or WEBP · up to 15 MB each · attach as many as you have</span>
+        <input type="file" id="quotes" name="quotations[]" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" hidden>
+      </label>
+      <ul class="attach-list" id="quoteList"></ul>
+      <p class="muted small" id="quoteEmpty"><?= $already
+          ? 'No new files selected.'
+          : 'No quotations attached yet — you can still ' . ($editing ? 'save' : 'raise') . ' the requisition without one.' ?></p>
+    </div>
+    <div class="card quote-actions">
+      <button type="button" class="btn secondary" onclick="showStep('items')">← Back to items</button>
+      <button class="btn" id="submitMr" disabled><?= $editing ? 'Save changes →' : 'Raise requisition →' ?></button>
     </div>
   </div>
 </form>
@@ -130,6 +174,7 @@ if ($editing) {
 <script>
 const BASE = <?= json_encode($base) ?>;
 const CSRF = <?= json_encode(Csrf::token()) ?>;
+const CLIP = <?= json_encode(\App\Icons::svg('paperclip', 'clip-ico')) ?>;
 const cart = new Map();      // id -> {id, code, name, uom, price, qty, custom}
 let items = [], customSeq = 0;
 const SEED = <?= json_encode($seed) ?>;
@@ -248,6 +293,8 @@ function renderCart(){
   let total=0; cart.forEach(l=>{ if(l.price!=null) total+=l.price*l.qty; });
   document.getElementById('total').textContent='RM '+fmt(total);
   document.getElementById('raise').disabled = cart.size===0;
+  document.getElementById('submitMr').disabled = cart.size===0;
+  document.getElementById('stepLineCount').textContent = cart.size;
 }
 document.getElementById('mrForm').addEventListener('submit',e=>{
   const box=document.getElementById('lineInputs'); box.innerHTML=''; let i=0;
@@ -257,8 +304,57 @@ document.getElementById('mrForm').addEventListener('submit',e=>{
     add('raw_description',l.name); add('qty',l.qty); add('uom',l.uom);
     i++;
   });
-  if(i===0){ e.preventDefault(); alert('Add at least one line.'); }
+  if(i===0){ e.preventDefault(); showStep('items'); alert('Add at least one line.'); }
 });
+
+// ---- Step 1 Items / Step 2 Quotations -------------------------------------
+function showStep(which){
+  const onQuotes = which === 'quotes';
+  document.getElementById('paneItems').hidden = onQuotes;
+  document.getElementById('paneQuotes').hidden = !onQuotes;
+  document.getElementById('tabItems').classList.toggle('active', !onQuotes);
+  document.getElementById('tabQuotes').classList.toggle('active', onQuotes);
+  document.getElementById('tabItems').setAttribute('aria-selected', String(!onQuotes));
+  document.getElementById('tabQuotes').setAttribute('aria-selected', String(onQuotes));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// The file input is the source of truth; removing a file rebuilds it via DataTransfer.
+const quotes = document.getElementById('quotes');
+const dropzone = document.getElementById('dropzone');
+function renderQuotes(){
+  const files = [...quotes.files];
+  document.getElementById('stepQuoteCount').textContent = files.length;
+  document.getElementById('quoteEmpty').hidden = files.length > 0;
+  document.getElementById('quoteList').innerHTML = files.map((f,i)=>`
+    <li class="attach-row">
+      <span class="clip">${CLIP}</span>
+      <span class="fn">${esc(f.name)}</span>
+      <span class="sz muted small">${size(f.size)}</span>
+      <button type="button" class="x" title="Remove" onclick="dropQuote(${i})">×</button>
+    </li>`).join('');
+}
+function dropQuote(idx){
+  const dt = new DataTransfer();
+  [...quotes.files].forEach((f,i)=>{ if(i!==idx) dt.items.add(f); });
+  quotes.files = dt.files;
+  renderQuotes();
+}
+quotes.addEventListener('change', renderQuotes);
+['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev,e=>{ e.preventDefault(); dropzone.classList.add('over'); }));
+['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{ e.preventDefault(); dropzone.classList.remove('over'); }));
+dropzone.addEventListener('drop',e=>{
+  const dt = new DataTransfer();
+  [...quotes.files].forEach(f=>dt.items.add(f));
+  [...e.dataTransfer.files].forEach(f=>dt.items.add(f));
+  quotes.files = dt.files;
+  renderQuotes();
+});
+function size(b){
+  if(b < 1024) return b + ' B';
+  if(b < 1024*1024) return Math.round(b/1024) + ' KB';
+  return (b/1024/1024).toFixed(1) + ' MB';
+}
 let t; document.getElementById('q').addEventListener('input',e=>{ clearTimeout(t); t=setTimeout(()=>load(e.target.value),180); });
 function chip(v){ document.getElementById('q').value=v; load(v); }
 function fmt(n){ return (Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -279,6 +375,7 @@ document.querySelectorAll('.mr-fields select, .mr-fields input[type=date]').forE
   el.addEventListener('change', ph); el.addEventListener('input', ph); ph();
 });
 renderCart();
+renderQuotes();
 load('');
 syncUrgency();
 </script>

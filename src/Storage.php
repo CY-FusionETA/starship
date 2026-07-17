@@ -3,14 +3,21 @@ declare(strict_types=1);
 
 namespace App;
 
-/** Stores and streams DO images from the protected storage/ dir. */
+/** Stores and streams uploads (DO images, MR quotations) from the protected storage/ dir. */
 final class Storage
 {
-    /** Save raw image bytes; returns the relative path stored in the DB. */
+    /** Save raw DO image bytes; returns the relative path stored in the DB. */
     public static function saveImage(string $bytes, string $ext = 'jpg'): string
     {
+        return self::saveFile($bytes, $ext, 'do');
+    }
+
+    /** Save raw bytes under storage/<prefix>/<year>/<month>/; returns the relative path. */
+    public static function saveFile(string $bytes, string $ext = 'jpg', string $prefix = 'do'): string
+    {
         $ext = preg_replace('/[^a-z0-9]/i', '', $ext) ?: 'jpg';
-        $rel = 'do/' . date('Y') . '/' . date('m');
+        $prefix = preg_replace('/[^a-z0-9_-]/i', '', $prefix) ?: 'do';
+        $rel = $prefix . '/' . date('Y') . '/' . date('m');
         $dir = STORAGE_ROOT . '/' . $rel;
         if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
             throw new \RuntimeException("Cannot create storage directory: $rel");
@@ -30,8 +37,18 @@ final class Storage
         return STORAGE_ROOT . '/' . ltrim($rel, '/');
     }
 
-    /** Stream an image to an authenticated user. */
-    public static function stream(string $relPath): void
+    /** Delete a stored file; missing files are not an error. */
+    public static function delete(string $relPath): void
+    {
+        $abs = self::absPath($relPath);
+        if (is_file($abs)) @unlink($abs);
+    }
+
+    /**
+     * Stream a stored file to an authenticated user.
+     * $asName, when given, is the filename the browser shows on save/print.
+     */
+    public static function stream(string $relPath, ?string $asName = null): void
     {
         Auth::require();
         $abs = self::absPath($relPath);
@@ -45,6 +62,11 @@ final class Storage
         header('Content-Type: ' . $mime);
         header('Content-Length: ' . filesize($abs));
         header('Cache-Control: private, max-age=300');
+        if ($asName !== null && $asName !== '') {
+            // Strip anything that could break out of the header or the filename.
+            $safe = str_replace(['"', "\r", "\n", '\\', '/'], '', $asName);
+            header('Content-Disposition: inline; filename="' . $safe . '"');
+        }
         readfile($abs);
         exit;
     }

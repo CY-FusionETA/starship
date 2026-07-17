@@ -160,19 +160,47 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
 
   <!-- image -->
   <div class="card">
-    <h3>Signed DO</h3>
     <?php
       $ext = strtolower(pathinfo($do['image_path'], PATHINFO_EXTENSION));
-      $fileExists = $do['image_path'] && is_file(\App\Storage::absPath($do['image_path']));
+      $abs = \App\Storage::absPath($do['image_path']);
+      $fileExists = $do['image_path'] && is_file($abs);
+      $fileUrl = $base . '/delivery-orders/' . (int)$do['id'] . '/image';
+      // Uploads before the filename column, and DOs that arrived over WhatsApp,
+      // have no original name — label them by where they came from.
+      $fileName = trim((string)($do['original_filename'] ?? '')) ?: (
+        $do['source_channel'] === 'wazzup'
+          ? 'Signed DO from WhatsApp.' . ($ext ?: 'jpg')
+          : 'Signed DO.' . ($ext ?: 'jpg')
+      );
+      $bytes = $fileExists ? (int)filesize($abs) : 0;
+      $human = match (true) {
+          $bytes <= 0             => '',
+          $bytes < 1024           => $bytes . ' B',
+          $bytes < 1024 * 1024    => round($bytes / 1024) . ' KB',
+          default                 => number_format($bytes / 1024 / 1024, 1) . ' MB',
+      };
     ?>
+    <h3 style="margin-bottom:.5rem">Attachments <span class="badge muted"><?= $fileExists ? 1 : 0 ?></span></h3>
+    <ul class="attach-list">
+      <li class="attach-row">
+        <span class="clip"><?= \App\Icons::svg('paperclip', 'clip-ico') ?></span>
+        <?php if ($fileExists): ?>
+          <a class="fn" href="<?= e($fileUrl) ?>" target="_blank"><?= e($fileName) ?></a>
+          <span class="sz muted small"><?= e($human) ?></span>
+        <?php else: ?>
+          <span class="fn muted"><?= e($fileName) ?></span>
+          <span class="sz muted small">missing</span>
+        <?php endif; ?>
+      </li>
+    </ul>
     <?php if (!$fileExists): ?>
-      <p class="muted small" style="margin:0">The uploaded file is no longer available. Please re-capture this delivery order.</p>
-    <?php elseif ($ext === 'pdf'): ?>
-      <a class="btn secondary" href="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/image" target="_blank">Open PDF</a>
-    <?php else: ?>
-      <a href="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/image" target="_blank">
-        <img src="<?= e($base) ?>/delivery-orders/<?= (int)$do['id'] ?>/image" alt="Signed DO" style="width:100%;border:1px solid var(--fe-border);border-radius:8px">
+      <p class="muted small" style="margin:.4rem 0 0">The uploaded file is no longer available. Please re-capture this delivery order.</p>
+    <?php elseif ($ext !== 'pdf'): ?>
+      <a href="<?= e($fileUrl) ?>" target="_blank">
+        <img src="<?= e($fileUrl) ?>" alt="<?= e($fileName) ?>" style="width:100%;border:1px solid var(--fe-border);border-radius:8px;margin-top:.6rem">
       </a>
+    <?php else: ?>
+      <a class="btn secondary" style="margin-top:.6rem" href="<?= e($fileUrl) ?>" target="_blank">Open PDF</a>
     <?php endif; ?>
     <?php if ($do['handwritten_notes']): ?><p class="small muted" style="margin-top:.6rem"><strong>Notes:</strong> <?= e($do['handwritten_notes']) ?></p><?php endif; ?>
   </div>

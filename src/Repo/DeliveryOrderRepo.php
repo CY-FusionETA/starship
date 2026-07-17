@@ -49,6 +49,7 @@ final class DeliveryOrderRepo
                 'project_code_raw'  => trim($h['project_code_raw'] ?? '') ?: null,
                 'delivery_date'     => ($h['delivery_date'] ?? '') ?: null,
                 'image_path'        => $h['image_path'],
+                'original_filename' => trim($h['original_filename'] ?? '') ?: null,
                 'source_channel'    => 'manual_upload',
                 'signature_present' => (array_key_exists('signature_present', $h) && $h['signature_present'] !== '' && $h['signature_present'] !== null) ? (int)(bool)$h['signature_present'] : null,
                 'handwritten_notes' => trim($h['handwritten_notes'] ?? '') ?: null,

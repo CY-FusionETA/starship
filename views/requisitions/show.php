@@ -1,6 +1,7 @@
-<?php /** @var array $req @var array $lines @var array $suppliers @var ?string $error */
+<?php /** @var array $req @var array $lines @var array $attachments @var array $suppliers @var ?string $error */
 use App\Auth;
 use App\Csrf;
+use App\Icons;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $hasRemaining = false;
 foreach ($lines as $l) { if ($l['remaining'] > 0.00001) { $hasRemaining = true; break; } }
@@ -62,6 +63,47 @@ $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered
     <?php endforeach; ?>
     </tbody>
   </table>
+</div>
+
+<?php
+$isDraft   = $req['status'] === 'draft';
+$canAttach = $isDraft && Auth::is('requester', 'staff', 'purchaser', 'admin');
+$fsize = function ($b) {
+    $b = (int)$b;
+    if ($b <= 0) return '';
+    if ($b < 1024) return $b . ' B';
+    if ($b < 1024 * 1024) return round($b / 1024) . ' KB';
+    return number_format($b / 1024 / 1024, 1) . ' MB';
+}; ?>
+<div class="card">
+  <h3>Attachments <span class="badge muted"><?= count($attachments) ?></span>
+    <span class="muted small" style="font-weight:400">— quotations supporting this requisition</span></h3>
+  <?php if ($attachments): ?>
+    <ul class="attach-list">
+      <?php foreach ($attachments as $a): ?>
+        <li class="attach-row">
+          <span class="clip"><?= Icons::svg('paperclip', 'clip-ico') ?></span>
+          <a class="fn" href="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments/<?= (int)$a['id'] ?>/file" target="_blank"><?= e($a['original_filename']) ?></a>
+          <span class="sz muted small"><?= e($fsize($a['size_bytes'])) ?><?= $a['uploaded_by_name'] ? ' · ' . e($a['uploaded_by_name']) : '' ?></span>
+          <?php if ($canAttach || Auth::isAdmin()): ?>
+            <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments/<?= (int)$a['id'] ?>/delete" onsubmit="return confirm('Remove <?= e($a['original_filename']) ?>?')" style="display:inline">
+              <?= Csrf::field() ?><button class="x" title="Remove">×</button>
+            </form>
+          <?php endif; ?>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  <?php else: ?>
+    <p class="muted small" style="margin:0">No quotations attached to this requisition.</p>
+  <?php endif; ?>
+  <?php if ($canAttach): ?>
+    <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/attachments" enctype="multipart/form-data" class="row" style="align-items:flex-end;margin-top:.8rem">
+      <?= Csrf::field() ?>
+      <div style="flex:2"><label>Attach quotation</label>
+        <input type="file" name="quotations[]" multiple required accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"></div>
+      <div><button class="btn secondary">Attach</button></div>
+    </form>
+  <?php endif; ?>
 </div>
 
 <?php if ($canOrder): ?>

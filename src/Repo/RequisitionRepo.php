@@ -5,9 +5,14 @@ namespace App\Repo;
 
 use App\Db;
 use App\Auth;
+use App\Storage;
 
 final class RequisitionRepo
 {
+    /** File types accepted as a quotation attachment. */
+    public const ATTACH_EXTS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+    public const ATTACH_MAX_BYTES = 15 * 1024 * 1024;
+
     public static function find(int $id): ?array
     {
         return Db::one(
@@ -21,7 +26,8 @@ final class RequisitionRepo
     {
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code,
-                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count
+                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count,
+                    (SELECT COUNT(*) FROM requisition_attachments a WHERE a.requisition_id = r.id) AS attachment_count
              FROM requisitions r JOIN projects p ON p.id = r.project_id
              ORDER BY r.created_at DESC"
         );
@@ -43,7 +49,8 @@ final class RequisitionRepo
     {
         return Db::all(
             "SELECT r.*, p.name AS project_name, p.project_code, u.name AS created_by_name,
-                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count
+                    (SELECT COUNT(*) FROM requisition_lines l WHERE l.requisition_id = r.id) AS line_count,
+                    (SELECT COUNT(*) FROM requisition_attachments a WHERE a.requisition_id = r.id) AS attachment_count
              FROM requisitions r
              JOIN projects p ON p.id = r.project_id
              LEFT JOIN users u ON u.id = r.created_by
@@ -85,6 +92,85 @@ final class RequisitionRepo
             $l['remaining'] = (float)$l['qty'] - (float)$l['qty_ordered'];
         }
         return $lines;
+    }
+
+    /** Quotations (and any other files) attached to an MR, oldest first. */
+    public static function attachments(int $reqId): array
+    {
+        return Db::all(
+            "SELECT a.*, u.name AS uploaded_by_name
+             FROM requisition_attachments a
+             LEFT JOIN users u ON u.id = a.uploaded_by
+             WHERE a.requisition_id = ? ORDER BY a.id",
+            [$reqId]
+        );
+    }
+
+    public static function findAttachment(int $id): ?array
+    {
+        return Db::one("SELECT * FROM requisition_attachments WHERE id = ?", [$id]);
+    }
+
+    /**
+     * Store one or more uploaded quotation files against an MR.
+     * $files is a $_FILES entry for a multi-file input (name/tmp_name/… are arrays).
+     * Returns [saved count, error messages] — a bad file is skipped, not fatal.
+     */
+    public static function attachUploads(int $reqId, array $files): array
+    {
+        $names = (array)($files['name'] ?? []);
+        $saved = 0; $errors = [];
+        foreach ($names as $i => $name) {
+            $err = (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err === UPLOAD_ERR_NO_FILE) continue;
+            $label = trim((string)$name) !== '' ? $name : 'file';
+            if ($err !== UPLOAD_ERR_OK) { $errors[] = "“{$label}” did not upload (code {$err})."; continue; }
+            $tmp = (string)($files['tmp_name'][$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) { $errors[] = "“{$label}” did not upload."; continue; }
+            $size = (int)($files['size'][$i] ?? 0);
+            if ($size > self::ATTACH_MAX_BYTES) {
+                $errors[] = "“{$label}” is larger than " . (int)(self::ATTACH_MAX_BYTES / 1024 / 1024) . " MB.";
+                continue;
+            }
+            $ext = strtolower(pathinfo((string)$name, PATHINFO_EXTENSION));
+            if (!in_array($ext, self::ATTACH_EXTS, true)) {
+                $errors[] = "“{$label}” must be a " . implode(', ', self::ATTACH_EXTS) . ' file.';
+                continue;
+            }
+            $bytes = file_get_contents($tmp);
+            if ($bytes === false) { $errors[] = "“{$label}” could not be read."; continue; }
+            $path = Storage::saveFile($bytes, $ext, 'quotations');
+            Db::insert('requisition_attachments', [
+                'requisition_id'    => $reqId,
+                'kind'              => 'quotation',
+                'file_path'         => $path,
+                'original_filename' => self::cleanFilename((string)$name),
+                'mime_type'         => (string)($files['type'][$i] ?? '') ?: null,
+                'size_bytes'        => $size ?: null,
+                'uploaded_by'       => Auth::id(),
+            ]);
+            $saved++;
+        }
+        if ($saved) AuditRepo::log('requisition', $reqId, 'attach_quotation');
+        return [$saved, $errors];
+    }
+
+    public static function deleteAttachment(int $id): void
+    {
+        $a = self::findAttachment($id);
+        if (!$a) return;
+        Db::q("DELETE FROM requisition_attachments WHERE id = ?", [$id]);
+        Storage::delete($a['file_path']);
+        AuditRepo::log('requisition', (int)$a['requisition_id'], 'remove_quotation');
+    }
+
+    /** Keep the user's filename recognisable but harmless as a header / link label. */
+    private static function cleanFilename(string $name): string
+    {
+        $name = basename(str_replace('\\', '/', $name));
+        $name = preg_replace('/[\x00-\x1f"]/', '', $name) ?? $name;
+        $name = trim($name) ?: 'attachment';
+        return mb_substr($name, 0, 180);
     }
 
     /** Create MR header + lines. $lines: array of [catalogue_item_id?, raw_description, model_type?, qty, uom?, remarks?]. */
@@ -176,7 +262,8 @@ final class RequisitionRepo
         if (self::hasPurchaseOrders($id)) {
             throw new \RuntimeException('Cannot delete: purchase orders were already raised from this requisition.');
         }
-        Db::q("DELETE FROM requisitions WHERE id = ?", [$id]); // requisition_lines cascade
+        foreach (self::attachments($id) as $a) Storage::delete($a['file_path']);
+        Db::q("DELETE FROM requisitions WHERE id = ?", [$id]); // lines + attachments cascade
         AuditRepo::log('requisition', $id, 'delete');
     }
 
