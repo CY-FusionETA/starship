@@ -23,6 +23,7 @@ use App\Repo\RequisitionRepo;
 use App\Repo\DashboardRepo;
 use App\Repo\PurchaseOrderRepo;
 use App\Repo\DeliveryOrderRepo;
+use App\Repo\AuditRepo;
 use App\Service\MatchingService;
 use App\Service\GeminiOcrService;
 use App\Storage;
@@ -297,7 +298,11 @@ $r->get('/requisitions', function () {
 });
 $r->get('/requisitions/new', function () {
     Perm::require("mr_create");
-    Response::view('requisitions/form', ['projects' => ProjectRepo::allForUser(), 'catalogue' => CatalogueRepo::all()], 'New requisition');
+    Response::view('requisitions/form', [
+        'projects'  => ProjectRepo::allForUser(),
+        'catalogue' => CatalogueRepo::all(),
+        'suppliers' => SupplierRepo::active(),
+    ], 'New requisition');
 });
 $r->post('/requisitions/save', function () {
     Perm::require("mr_create");
@@ -322,8 +327,8 @@ $r->get('/requisitions/{id}', function ($p) {
         'req'         => $req,
         'lines'       => RequisitionRepo::lines((int)$p['id']),
         'attachments' => RequisitionRepo::attachments((int)$p['id']),
-        'suppliers'   => SupplierRepo::all(),
         'error'       => $_GET['err'] ?? null,
+        'ok'          => $_GET['ok'] ?? null,
     ], 'MR ' . $req['mr_number']);
 });
 // Quotation attachments — add while the MR is still a draft, view at any time.
@@ -364,9 +369,15 @@ $r->post('/requisitions/{id}/attachments/{aid}/delete', function ($p) {
 $r->post('/requisitions/{id}/approve', function ($p) {
     Perm::require("mr_approve");
     Csrf::check();
-    RequisitionRepo::approve((int)$p['id']);
+    $reqId = (int)$p['id'];
+    RequisitionRepo::approve($reqId);
+    // On approval, auto-raise the draft PO and push it to Xero (DRAFT) with the
+    // MR's quotations attached. A PO/Xero hiccup must never block the approval.
+    $poId = null;
+    try { $poId = PurchaseOrderRepo::createDraftFromApprovedMr($reqId); }
+    catch (\Throwable $ex) { AuditRepo::log('requisition', $reqId, 'auto_po_failed', ['error' => $ex->getMessage()]); }
     if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
-    Response::redirect('/requisitions/' . (int)$p['id']);
+    Response::redirect('/requisitions/' . $reqId . ($poId ? '?ok=' . rawurlencode('Draft PO raised and pushed to Xero.') : ''));
 });
 $r->post('/requisitions/{id}/reject', function ($p) {
     Perm::require("mr_approve");
@@ -375,29 +386,6 @@ $r->post('/requisitions/{id}/reject', function ($p) {
     if (($_POST['return'] ?? '') === 'approvals') Response::redirect('/approvals');
     Response::redirect('/requisitions/' . (int)$p['id']);
 });
-$r->post('/requisitions/{id}/create-po', function ($p) {
-    Perm::require("po_create");
-    Csrf::check();
-    $reqId = (int)$p['id'];
-    $poNumber = trim($_POST['po_number'] ?? '');
-    $supplierId = (int)($_POST['supplier_id'] ?? 0);
-    $selected = [];
-    foreach (($_POST['poline'] ?? []) as $rlId => $row) {
-        if (empty($row['include'])) continue;
-        $selected[] = ['requisition_line_id' => (int)$rlId, 'qty' => $row['qty'] ?? 0, 'unit_price' => $row['unit_price'] ?? null];
-    }
-    $err = null;
-    if ($poNumber === '' || $supplierId === 0) $err = 'Supplier and PO number are required.';
-    elseif (PurchaseOrderRepo::poNumberExists($poNumber)) $err = 'PO number "' . $poNumber . '" already exists.';
-    elseif (!$selected) $err = 'Select at least one line to order.';
-    if ($err) Response::redirect('/requisitions/' . $reqId . '?err=' . rawurlencode($err));
-    try {
-        $poId = PurchaseOrderRepo::createFromRequisition($reqId, $supplierId, $poNumber, $_POST['order_date'] ?? null, $selected);
-    } catch (\Throwable $ex) {
-        Response::redirect('/requisitions/' . $reqId . '?err=' . rawurlencode($ex->getMessage()));
-    }
-    Response::redirect('/purchase-orders/' . $poId);
-});
 $r->get('/requisitions/{id}/edit', function ($p) {
     Perm::require("mr_edit");
     $req = mr_or_404((int)$p['id']);
@@ -405,6 +393,7 @@ $r->get('/requisitions/{id}/edit', function ($p) {
     Response::view('requisitions/form', [
         'projects'    => ProjectRepo::allForUser(),
         'catalogue'   => CatalogueRepo::all(),
+        'suppliers'   => SupplierRepo::active(),
         'req'         => $req,
         'lines'       => RequisitionRepo::lines((int)$p['id']),
         'attachments' => RequisitionRepo::attachments((int)$p['id']),

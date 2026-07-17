@@ -1,17 +1,13 @@
-<?php /** @var array $req @var array $lines @var array $attachments @var array $suppliers @var ?string $error */
+<?php /** @var array $req @var array $lines @var array $attachments @var ?string $error @var ?string $ok */
 use App\Auth;
 use App\Perm;
 use App\Csrf;
 use App\Icons;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
-$hasRemaining = false;
-foreach ($lines as $l) { if ($l['remaining'] > 0.00001) { $hasRemaining = true; break; } }
-// Raising a PO is a procurement job and the form carries unit prices — a
-// requester sees the approved MR, but not the ordering block.
-$canOrder = in_array($req['status'], ['approved', 'partially_ordered'], true) && $hasRemaining && Perm::can('po_create');
 $sbadge = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_ordered'=>'warn','fully_ordered'=>'ok','cancelled'=>'muted'][$s] ?? 'muted') . '">' . e(str_replace('_',' ',$s)) . '</span>'; ?>
 
 <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
+<?php if (!empty($ok)): ?><div class="alert ok">✓ <?= e($ok) ?></div><?php endif; ?>
 
 <div class="toolbar">
   <div>
@@ -117,38 +113,31 @@ $fsize = function ($b) {
   <?php endif; ?>
 </div>
 
-<?php if ($canOrder): ?>
+<?php
+// A single draft PO is raised automatically when the PM approves this MR, then
+// pushed to Xero as a DRAFT with the quotations attached. Show where it landed.
+$pos = \App\Db::all(
+    "SELECT id, po_number, status, xero_po_id, xero_last_error
+     FROM purchase_orders WHERE requisition_id = ? ORDER BY created_at DESC",
+    [(int)$req['id']]
+);
+if ($pos): ?>
 <div class="card">
-  <h3>Raise a Purchase Order <span class="muted small">— pick a supplier and the lines to order from them</span></h3>
-  <form method="post" action="<?= e($base) ?>/requisitions/<?= (int)$req['id'] ?>/create-po">
-    <?= Csrf::field() ?>
-    <div class="row">
-      <div><label>Supplier *</label>
-        <select name="supplier_id" required>
-          <option value="">— select —</option>
-          <?php foreach ($suppliers as $s): ?><option value="<?= (int)$s['id'] ?>"><?= e($s['name']) ?></option><?php endforeach; ?>
-        </select>
-      </div>
-      <div><label>PO No. *</label><input name="po_number" required placeholder="130536"></div>
-      <div><label>Order date</label><input name="order_date" type="date"></div>
-    </div>
-    <table style="margin-top:.6rem">
-      <thead><tr><th>Include</th><th>Particulars</th><th>Remaining</th><th style="width:12%">Order qty</th><th style="width:14%">Unit price (MYR)</th></tr></thead>
-      <tbody>
-      <?php foreach ($lines as $l): if ($l['remaining'] <= 0.00001) continue; ?>
-        <tr>
-          <td><input type="checkbox" name="poline[<?= (int)$l['id'] ?>][include]" value="1" checked style="width:auto"></td>
-          <td><?= e($l['raw_description']) ?></td>
-          <td><?= rtrim(rtrim(number_format((float)$l['remaining'],2),'0'),'.') ?> <?= e($l['uom']) ?></td>
-          <td><input name="poline[<?= (int)$l['id'] ?>][qty]" type="number" step="any" min="0" max="<?= (float)$l['remaining'] ?>" value="<?= rtrim(rtrim(number_format((float)$l['remaining'],2,'.',''),'0'),'.') ?>"></td>
-          <td><input name="poline[<?= (int)$l['id'] ?>][unit_price]" type="number" step="any" min="0" placeholder="optional"></td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
-    <div style="margin-top:1rem"><button class="btn">Create Purchase Order</button></div>
-    <p class="muted small">Xero push is stubbed until its credentials are provisioned — the PO is recorded here and the intent is logged.</p>
-  </form>
+  <h3>Purchase order <span class="muted small">— raised on approval, drafted in Xero for procurement to finalise</span></h3>
+  <ul class="attach-list" style="margin:0">
+    <?php foreach ($pos as $po): ?>
+      <li class="attach-row">
+        <a class="fn" href="<?= e($base) ?>/purchase-orders/<?= (int)$po['id'] ?>"><?= e($po['po_number']) ?></a>
+        <?php if (!empty($po['xero_po_id'])): ?>
+          <span class="badge ok">✓ in Xero (draft)</span>
+        <?php elseif (!empty($po['xero_last_error'])): ?>
+          <span class="badge danger" title="<?= e($po['xero_last_error']) ?>">Xero push failed</span>
+        <?php else: ?>
+          <span class="badge muted">not synced</span>
+        <?php endif; ?>
+      </li>
+    <?php endforeach; ?>
+  </ul>
 </div>
 <?php endif; ?>
 

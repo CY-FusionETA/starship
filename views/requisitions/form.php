@@ -48,6 +48,15 @@ if ($editing) {
         </div>
       </div>
       <div class="row">
+        <div style="flex:3"><label>Supplier <span class="muted small" style="font-weight:400">— optional; the draft PO is raised to them when the PM approves</span></label>
+          <?php $selSup = $editing ? (int)($req['supplier_id'] ?? 0) : 0; ?>
+          <select name="supplier_id">
+            <option value="">— to be confirmed —</option>
+            <?php foreach (($suppliers ?? []) as $s): ?><option value="<?= (int)$s['id'] ?>" <?= $selSup === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['name']) ?></option><?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <div class="row">
         <div><label>Requested by</label><input name="requested_by" placeholder="ARASH" value="<?= $editing ? e($req['requested_by']) : '' ?>"></div>
         <div><label>Mobile Number</label><input name="requester_mobile" type="tel" placeholder="+60 12-345 6789" value="<?= $editing ? e($req['requester_mobile'] ?? '') : '' ?>"></div>
         <div><label>Email</label><input name="requester_email" type="email" placeholder="name@company.com" value="<?= $editing ? e($req['requester_email'] ?? '') : '' ?>"></div>

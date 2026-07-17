@@ -16,7 +16,7 @@ final class XeroApiClient implements XeroClientInterface
 {
     private const API = 'https://api.xero.com/api.xro/2.0/';
 
-    public function createPurchaseOrder(array $po, array $lines): array
+    public function createPurchaseOrder(array $po, array $lines, array $attachments = []): array
     {
         try {
             $auth = XeroOAuth::accessToken();
@@ -53,7 +53,7 @@ final class XeroApiClient implements XeroClientInterface
                 'Date'                => !empty($po['order_date']) ? substr((string)$po['order_date'], 0, 10) : null,
                 'Reference'           => !empty($po['mr_number']) ? ('MR ' . $po['mr_number']) : null,
                 'CurrencyCode'        => $po['currency'] ?? 'MYR',
-                'Status'              => 'AUTHORISED',
+                'Status'              => 'DRAFT',
                 'LineItems'           => $lineItems,
             ], fn($v) => $v !== null && $v !== '');
 
@@ -80,11 +80,82 @@ final class XeroApiClient implements XeroClientInterface
                     [$created['Contact']['ContactID'], (int)$po['supplier_id']]);
             }
             AuditRepo::log('purchase_order', (int)$po['id'], 'xero_po_created', ['xero_po_id' => $xeroId]);
+
+            // Upload the MR's quotation files against the draft PO. Each is
+            // best-effort: a failed upload (e.g. the connection lacks the
+            // accounting.attachments scope) is logged, never fatal.
+            foreach ($attachments as $att) {
+                self::uploadAttachment($auth, (string)$xeroId, (int)$po['id'], $att);
+            }
+
             return ['xero_po_id' => $xeroId, 'stubbed' => false];
         } catch (\Throwable $e) {
             AuditRepo::log('purchase_order', (int)($po['id'] ?? 0), 'xero_po_error', ['error' => $e->getMessage()]);
             return ['xero_po_id' => null, 'stubbed' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Attach one file to a Xero purchase order. Needs the accounting.attachments
+     * scope on the connection; on any failure it logs and returns quietly so the
+     * PO push is never rolled back for a missing quotation.
+     * $att: ['filename'=>string, 'mime'=>?string, 'abs_path'=>string].
+     */
+    private static function uploadAttachment(array $auth, string $xeroPoId, int $poDbId, array $att): void
+    {
+        try {
+            $abs = (string)($att['abs_path'] ?? '');
+            if ($abs === '' || !is_file($abs)) return;
+            $bytes = file_get_contents($abs);
+            if ($bytes === false || $bytes === '') return;
+
+            $filename = self::safeAttachmentName((string)($att['filename'] ?? 'quotation'), $abs);
+            $mime = (string)($att['mime'] ?? '') ?: self::guessMime($abs);
+
+            $url = self::API . 'PurchaseOrders/' . rawurlencode($xeroPoId) . '/Attachments/' . rawurlencode($filename);
+            [$code, $body] = XeroOAuth::http('POST', $url, [
+                'Authorization: Bearer ' . $auth['access_token'],
+                'Xero-tenant-id: ' . $auth['tenant_id'],
+                'Accept: application/json',
+                'Content-Type: ' . $mime,
+            ], $bytes);
+
+            if ($code < 200 || $code >= 300) {
+                AuditRepo::log('purchase_order', $poDbId, 'xero_attach_failed', [
+                    'file' => $filename, 'http' => $code,
+                    'error' => self::extractError(json_decode($body, true), $body),
+                ]);
+            } else {
+                AuditRepo::log('purchase_order', $poDbId, 'xero_attach_uploaded', ['file' => $filename]);
+            }
+        } catch (\Throwable $e) {
+            AuditRepo::log('purchase_order', $poDbId, 'xero_attach_error', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /** Keep a quotation filename safe for the Attachments URL, extension intact. */
+    private static function safeAttachmentName(string $name, string $abs): string
+    {
+        $name = basename(str_replace('\\', '/', $name));
+        $name = preg_replace('/[^A-Za-z0-9._-]+/', '_', $name) ?? $name;
+        $name = trim($name, '._') ?: 'quotation';
+        if (pathinfo($name, PATHINFO_EXTENSION) === '') {
+            $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION) ?: 'pdf');
+            $name .= '.' . $ext;
+        }
+        return mb_substr($name, 0, 200);
+    }
+
+    /** Best-effort MIME from a file extension (quotations are pdf/jpg/png/webp). */
+    private static function guessMime(string $abs): string
+    {
+        return match (strtolower(pathinfo($abs, PATHINFO_EXTENSION))) {
+            'pdf'         => 'application/pdf',
+            'png'         => 'image/png',
+            'webp'        => 'image/webp',
+            'jpg', 'jpeg' => 'image/jpeg',
+            default       => 'application/octet-stream',
+        };
     }
 
     public function createBill(array $bill, array $lines): array

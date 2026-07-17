@@ -8,12 +8,13 @@ use App\Repo\AuditRepo;
 /** Logs intended Xero calls to the audit log; no network. Default until creds exist. */
 final class XeroStubClient implements XeroClientInterface
 {
-    public function createPurchaseOrder(array $po, array $lines): array
+    public function createPurchaseOrder(array $po, array $lines, array $attachments = []): array
     {
         AuditRepo::log('purchase_order', (int)($po['id'] ?? 0), 'xero_stub_create_po', [
-            'po_number' => $po['po_number'] ?? null,
-            'lines'     => count($lines),
-            'note'      => 'Xero disabled — would push PO here.',
+            'po_number'   => $po['po_number'] ?? null,
+            'lines'       => count($lines),
+            'attachments' => count($attachments),
+            'note'        => 'Xero disabled — would push DRAFT PO + quotations here.',
         ]);
         return ['xero_po_id' => null, 'stubbed' => true];
     }

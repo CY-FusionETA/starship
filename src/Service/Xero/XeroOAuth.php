@@ -18,7 +18,7 @@ final class XeroOAuth
     private const CONNECTIONS = 'https://api.xero.com/connections';
 
     public const DEFAULT_SCOPES =
-        'openid profile email accounting.transactions accounting.contacts accounting.settings offline_access';
+        'openid profile email accounting.transactions accounting.contacts accounting.settings accounting.attachments offline_access';
 
     // Connection params come from the DB (Settings tab), NOT config.php — the
     // config 'xero' block is placeholder scaffold, so we read raw() with code defaults.

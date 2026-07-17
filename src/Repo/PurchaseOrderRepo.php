@@ -6,6 +6,7 @@ namespace App\Repo;
 use App\Db;
 use App\Auth;
 use App\Perm;
+use App\Storage;
 use App\Support\Normalizer;
 use App\Support\Filter;
 use App\Service\Xero\XeroClientFactory;
@@ -317,7 +318,7 @@ final class PurchaseOrderRepo
         if (!empty($po['xero_po_id'])) {
             return ['xero_po_id' => $po['xero_po_id'], 'stubbed' => false, 'already' => true];
         }
-        $res = XeroClientFactory::make()->createPurchaseOrder($po, self::lines($poId));
+        $res = XeroClientFactory::make()->createPurchaseOrder($po, self::lines($poId), self::mrAttachmentsFor($po));
         if (!empty($res['xero_po_id'])) {
             Db::update('purchase_orders', $poId, [
                 'xero_po_id'      => $res['xero_po_id'],
@@ -328,5 +329,77 @@ final class PurchaseOrderRepo
             Db::update('purchase_orders', $poId, ['xero_last_error' => $res['error']]);
         }
         return $res;
+    }
+
+    /**
+     * Raise the draft PO for a just-approved MR: one PO covering every line
+     * still to be ordered, prices left blank for procurement to fill in Xero.
+     * The supplier is the MR's chosen supplier, or a "To Be Confirmed"
+     * placeholder when none was set. Delegates to createFromRequisition (which
+     * pushes to Xero as a DRAFT with the MR's quotations attached). Returns the
+     * new PO id, or null when there is nothing to order / a PO already exists.
+     */
+    public static function createDraftFromApprovedMr(int $reqId): ?int
+    {
+        // One MR → one auto-raised PO. Never double-create on re-approval.
+        if (RequisitionRepo::hasPurchaseOrders($reqId)) return null;
+
+        $req = Db::one("SELECT * FROM requisitions WHERE id = ?", [$reqId]);
+        if (!$req) return null;
+
+        $supplierId = (int)($req['supplier_id'] ?? 0) ?: self::placeholderSupplierId();
+
+        $selected = [];
+        foreach (Db::all("SELECT * FROM requisition_lines WHERE requisition_id = ? ORDER BY line_no", [$reqId]) as $rl) {
+            $remaining = (float)$rl['qty'] - (float)$rl['qty_ordered'];
+            if ($remaining <= 0) continue;
+            // unit_price left null — the quotation is the price source; procurement
+            // fills prices on the draft in Xero before authorising it.
+            $selected[] = ['requisition_line_id' => (int)$rl['id'], 'qty' => $remaining, 'unit_price' => null];
+        }
+        if (!$selected) return null;
+
+        return self::createFromRequisition(
+            $reqId, $supplierId, self::autoPoNumber((string)$req['mr_number']), date('Y-m-d'), $selected
+        );
+    }
+
+    /** A unique auto PO number derived from the MR number (PO-<mr>, then -2, -3…). */
+    private static function autoPoNumber(string $mrNumber): string
+    {
+        $base = 'PO-' . (trim($mrNumber) !== '' ? trim($mrNumber) : 'MR');
+        $no = $base; $i = 1;
+        while (self::poNumberExists($no)) { $i++; $no = $base . '-' . $i; }
+        return $no;
+    }
+
+    /** Find (or lazily create) the placeholder supplier for MRs with none set. */
+    private static function placeholderSupplierId(): int
+    {
+        $existing = Db::one("SELECT id FROM suppliers WHERE name = ?", ['To Be Confirmed']);
+        if ($existing) return (int)$existing['id'];
+        // Inactive so it never clutters the MR supplier picker; procurement
+        // swaps it for the real contact on the draft PO inside Xero.
+        return Db::insert('suppliers', ['name' => 'To Be Confirmed', 'is_active' => 0]);
+    }
+
+    /**
+     * The MR's quotation files, shaped for the Xero client to upload against the
+     * PO. Skips anything missing on disk. Empty when the PO has no source MR.
+     */
+    private static function mrAttachmentsFor(array $po): array
+    {
+        if (empty($po['requisition_id'])) return [];
+        $out = [];
+        foreach (RequisitionRepo::attachments((int)$po['requisition_id']) as $a) {
+            $abs = Storage::absPath((string)$a['file_path']);
+            if (!is_file($abs)) continue;
+            $out[] = [
+                'filename' => (string)($a['original_filename'] ?: 'quotation'),
+                'mime'     => $a['mime_type'] ?: null,
+                'abs_path' => $abs,
+            ];
+        }
+        return $out;
     }
 }

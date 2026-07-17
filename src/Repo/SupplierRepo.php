@@ -17,6 +17,12 @@ final class SupplierRepo
         return Db::all("SELECT * FROM suppliers ORDER BY name");
     }
 
+    /** Active suppliers only — for pickers (hides the 'To Be Confirmed' placeholder). */
+    public static function active(): array
+    {
+        return Db::all("SELECT * FROM suppliers WHERE is_active = 1 ORDER BY name");
+    }
+
     public static function save(array $data, ?int $id = null): int
     {
         $fields = [

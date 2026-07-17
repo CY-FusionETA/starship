@@ -219,6 +219,7 @@ final class RequisitionRepo
             $reqId = Db::insert('requisitions', [
                 'mr_number'        => trim($header['mr_number']),
                 'project_id'       => (int)$header['project_id'],
+                'supplier_id'      => !empty($header['supplier_id']) ? (int)$header['supplier_id'] : null,
                 'requested_by'     => trim($header['requested_by'] ?? '') ?: null,
                 'requester_mobile' => trim($header['requester_mobile'] ?? '') ?: null,
                 'requester_email'  => trim($header['requester_email'] ?? '') ?: null,
@@ -266,6 +267,7 @@ final class RequisitionRepo
             Db::update('requisitions', $id, [
                 'mr_number'        => trim($header['mr_number']),
                 'project_id'       => (int)$header['project_id'],
+                'supplier_id'      => !empty($header['supplier_id']) ? (int)$header['supplier_id'] : null,
                 'requested_by'     => trim($header['requested_by'] ?? '') ?: null,
                 'requester_mobile' => trim($header['requester_mobile'] ?? '') ?: null,
                 'requester_email'  => trim($header['requester_email'] ?? '') ?: null,
