@@ -90,6 +90,15 @@ input::placeholder,textarea::placeholder{color:#9aa8b8}
 input:hover,select:hover,textarea:hover{border-color:#c7d2e0}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--fe-primary-2);
   box-shadow:0 0 0 3px rgba(45,77,179,.14)}
+/* Native file inputs: style the browser's default "Choose files" button so it
+   reads as a .btn.secondary.sm instead of the mismatched OS control. */
+input[type=file]{padding:.3rem .45rem;cursor:pointer;color:var(--fe-muted);font-size:.85rem;line-height:1.9}
+input[type=file]::file-selector-button,
+input[type=file]::-webkit-file-upload-button{
+  margin-right:.7rem;padding:.4rem .9rem;border:1.5px solid #c7d2e6;border-radius:var(--radius-btn);
+  background:#fff;color:var(--fe-primary);font:inherit;font-weight:600;font-size:.82rem;cursor:pointer;
+  transition:background .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease)}
+input[type=file]::file-selector-button:hover{background:#f7f9ff;border-color:var(--fe-primary-2);color:var(--fe-primary-2)}
 .row{display:flex;gap:1rem;flex-wrap:wrap}.row>div{flex:1;min-width:180px}
 /* All variants share ONE box model: same padding + a 1.5px border (transparent
    on filled buttons) so a primary, secondary or ghost button are pixel-identical
