@@ -133,26 +133,46 @@ td[colspan]{padding:1.6rem .7rem;text-align:center;color:var(--fe-muted)}
   color:var(--fe-primary);margin-bottom:.15rem;letter-spacing:-.02em}
 .login-card .btn{margin-top:.2rem}
 
-/* ---- List search + filter bar ---- */
-.filterbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0 0 1rem;padding:.7rem .8rem;
-  background:#fff;border:1px solid var(--fe-border);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
-.filterbar input,.filterbar select{margin:0}
+/* ---- List search + filter bar ----
+   Every control (search, selects, dates, buttons) is locked to --fb-h so the
+   row reads as one straight line. Base inputs and .btn.sm each bring their own
+   vertical padding and border width, so height + padding:0 is set explicitly
+   rather than trying to match paddings by eye. */
+.filterbar{--fb-h:2.4rem;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0 0 1rem;
+  padding:.7rem .8rem;background:#fff;border:1px solid var(--fe-border);border-radius:var(--radius);
+  box-shadow:var(--shadow-sm)}
+/* The global label rule carries margin:.7rem 0 .25rem — inside the bar that
+   pushed the date labels 11.2px down and made their wrapper 15.2px too tall. */
+.filterbar input,.filterbar select,.filterbar label{margin:0}
+.filterbar .fb-search input,
+.filterbar .fb-select,
+.filterbar .fb-date input,
+.filterbar .btn{height:var(--fb-h);padding-top:0;padding-bottom:0;font-size:.85rem}
 .fb-search{flex:1 1 240px;min-width:180px}
 .fb-search input{width:100%;padding-left:2.2rem;
   background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236B7A8D' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat .7rem center}
 .fb-search input::-webkit-search-cancel-button{cursor:pointer}
-.fb-select{flex:0 1 auto;width:auto;min-width:9rem;font-size:.85rem;padding:.45rem 1.8rem .45rem .6rem}
-/* From/To stay glued together so the range never splits across rows */
-.fb-daterange{display:inline-flex;align-items:center;gap:.4rem;flex:0 0 auto}
+.fb-select{flex:0 1 auto;width:auto;min-width:9rem;padding-left:.6rem;padding-right:1.8rem}
+/* From/To stay glued together so the range never splits across rows. Heights
+   come from the inputs themselves — a fixed height here plus height:100% on the
+   label made the label overflow its parent and sit 3.6px low. */
+.fb-daterange{display:flex;align-items:center;gap:.4rem;flex:0 0 auto}
 .fb-date{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:var(--fe-muted)}
-.fb-date input{width:auto;font-size:.85rem;padding:.45rem .5rem}
+.fb-date input{width:auto;padding-left:.5rem;padding-right:.5rem}
 .filterbar .is-placeholder{color:#9aa8b8}
 .fb-go{flex:0 0 auto}
 .fb-count{margin-left:auto;white-space:nowrap}
 td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
 @media(max-width:720px){
   .fb-count{margin-left:0;width:100%}
-  .fb-select,.fb-date{flex:1 1 45%}
+  .fb-select{flex:1 1 45%}
+  /* On a phone the From/To pair can't hold its natural width — let it take a
+     row of its own and share it, rather than pushing the page sideways.
+     min-width:0 is required: a flex item's automatic minimum size otherwise
+     refuses to shrink below the two date inputs' min-content width. */
+  .fb-daterange{flex:1 1 100%;min-width:0;flex-wrap:wrap}
+  .fb-date{flex:1 1 45%;min-width:0}
+  .fb-date input{width:100%;min-width:0}
 }
 
 /* Paperclip hints in list rows */
