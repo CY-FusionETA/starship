@@ -165,7 +165,7 @@ $plsb = fn($s) => '<span class="badge ' . (['open'=>'muted','partially_received'
             </div>
           <?php endforeach; ?>
         </div>
-        <div style="margin-top:1rem"><button class="btn" <?= $hasPo ? '' : 'disabled' ?>>Confirm &amp; post receipts</button></div>
+        <div style="margin-top:1rem"><button class="btn" <?= $hasPo ? '' : 'disabled' ?>>Confirm</button></div>
         <p class="muted small">
           Only the accepted quantity is receipted against the PO. Short or refused
           goods stay outstanding so the supplier still owes them. Accepting more
