@@ -1,96 +1,113 @@
 <?php
 /**
  * "How it works" — animated client-pitch showcase.
- * Self-contained (own CSS + JS, no data queries): a scripted, looping story of
- * a signed DO travelling WhatsApp → AI OCR → 3-way match → Xero, plus the full
- * MR→PO journey strip. Built to run on a projector in front of a client.
+ * A horizontal flow pipeline: a signed Delivery Order photo travels along a rail
+ * through four stations — WhatsApp → AI reads → Starship matches → Xero — each
+ * lighting up as the document arrives. Self-contained (own CSS + JS, no queries),
+ * loops with two rotating scenarios (a clean match and a short-delivery exception).
+ * Built to run on a projector in front of a client.
  */
 ?>
 <style>
-/* ---- Pitch page (scoped) ------------------------------------------------ */
+/* ---- Pitch stage (scoped) ---------------------------------------------- */
 .pitch-stage{position:relative;overflow:hidden;border-radius:18px;color:#fff;
-  background:radial-gradient(1200px 600px at 80% -10%,#24408f 0%,#16265c 45%,#101c46 100%);
-  padding:2.2rem 2rem 2.4rem;margin-bottom:1.25rem;box-shadow:var(--shadow-lg)}
+  background:radial-gradient(1200px 600px at 82% -10%,#24408f 0%,#16265c 45%,#101c46 100%);
+  padding:2.2rem 2rem 2.2rem;margin-bottom:1.25rem;box-shadow:var(--shadow-lg)}
 .pitch-stage::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
   background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);background-size:26px 26px}
 .pitch-kicker{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:#8fa8ee;margin-bottom:.4rem}
 .pitch-stage h1{color:#fff;font-size:1.9rem;margin:0 0 .25rem}
-.pitch-stage .pitch-sub{color:#c3d0f5;margin:0;font-size:.95rem}
+.pitch-stage .pitch-sub{color:#c3d0f5;margin:0;font-size:.95rem;max-width:760px}
 .pitch-live{position:absolute;top:1.4rem;right:1.6rem;display:inline-flex;align-items:center;gap:.45rem;
   font-size:.72rem;font-weight:700;letter-spacing:.08em;color:#9fe8b8;background:rgba(34,197,94,.12);
   border:1px solid rgba(34,197,94,.35);padding:.3rem .7rem;border-radius:999px}
 .pitch-live i{width:8px;height:8px;border-radius:50%;background:#22C55E;animation:p-blink 1.4s infinite}
 @keyframes p-blink{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.55);opacity:1}50%{box-shadow:0 0 0 6px rgba(34,197,94,0);opacity:.75}}
 
-/* Diagram canvas — fixed coordinate space, scrolls on small screens */
-.pd-wrap{overflow-x:auto;margin-top:1.6rem}
-.pd{position:relative;width:1000px;height:430px;margin:0 auto}
-.pd-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.pd-svg line{stroke:rgba(255,255,255,.28);stroke-width:2;stroke-dasharray:3 7;stroke-linecap:round}
-.pd-dot{fill:#FF6B35;filter:drop-shadow(0 0 6px rgba(255,107,53,.9));opacity:0}
-.pd-dot.go{opacity:1}
-.pd-node{position:absolute;transition:opacity .4s var(--ease),transform .4s var(--ease)}
+/* ---- Flow pipeline ------------------------------------------------------ */
+.flow-wrap{overflow-x:auto;margin-top:1.8rem;padding-bottom:.4rem}
+.flow{position:relative;width:1000px;height:452px;margin:0 auto}
+.frail{position:absolute;left:130px;top:118px;width:759px;height:4px;background:rgba(255,255,255,.14);border-radius:99px;z-index:0}
+.frail-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#1FA855,#2D4DB3 55%,#FF6B35);
+  box-shadow:0 0 12px rgba(255,107,53,.45);transition:width .9s var(--ease)}
 
-/* WhatsApp card (left) */
-.pd-wa{left:0;top:60px;width:250px;border-radius:14px;overflow:hidden;background:#e7e0d4;
-  box-shadow:0 14px 34px rgba(0,0,0,.35);font-size:.8rem}
-.pd-wa-head{background:#0b7f6f;color:#fff;padding:.55rem .75rem;display:flex;align-items:center;gap:.55rem}
-.pd-wa-head .av{width:26px;height:26px;border-radius:50%;background:#fff;color:#0b7f6f;font-weight:800;
-  display:grid;place-items:center;font-size:.75rem;flex-shrink:0}
-.pd-wa-head b{display:block;font-size:.78rem;line-height:1.2}
-.pd-wa-head span{display:block;font-size:.62rem;opacity:.85}
-.pd-wa-body{padding:.7rem .6rem .8rem;min-height:150px;display:flex;flex-direction:column;gap:.5rem}
-.pd-msg{max-width:88%;border-radius:10px;padding:.5rem .6rem;line-height:1.35;color:#1C2B3A;box-shadow:0 1px 2px rgba(0,0,0,.12);
-  opacity:0;transform:translateY(8px) scale(.96);transition:opacity .35s var(--ease),transform .35s var(--ease)}
-.pd-msg.show{opacity:1;transform:none}
-.pd-msg.out{background:#dcf8c6;align-self:flex-end}
-.pd-msg.in{background:#fff;align-self:flex-start}
-.pd-msg .doc{display:flex;align-items:center;gap:.5rem;background:rgba(11,127,111,.1);border-radius:8px;padding:.4rem .5rem;margin-bottom:.3rem}
-.pd-msg .doc .pg{width:26px;height:32px;background:#fff;border:1px solid #cbd5e1;border-radius:3px;position:relative;flex-shrink:0}
-.pd-msg .doc .pg::before{content:"";position:absolute;inset:5px 4px auto;height:2px;background:#94a3b8;box-shadow:0 5px 0 #cbd5e1,0 10px 0 #cbd5e1,0 15px 0 #cbd5e1}
-.pd-msg .doc .pg::after{content:"✍";position:absolute;right:-2px;bottom:-4px;font-size:.7rem}
-.pd-msg small{display:block;color:#6b7a8d;font-size:.62rem;margin-top:.15rem}
-.pd-msg .tick{color:#34b7f1;font-size:.66rem;float:right;margin:.2rem 0 0 .4rem}
+.fpacket{position:absolute;top:100px;left:130px;transform:translateX(-50%);width:42px;height:42px;border-radius:11px;
+  display:grid;place-items:center;font-size:1.15rem;background:#fff;z-index:1;opacity:0;
+  box-shadow:0 0 0 2px rgba(255,107,53,.65),0 8px 22px rgba(0,0,0,.45);filter:drop-shadow(0 0 9px rgba(255,107,53,.6));
+  transition:left .9s var(--ease),opacity .3s var(--ease)}
+.fpacket.go{opacity:1}
 
-/* AI orb + extraction (centre) */
-.pd-ai{left:380px;top:38px;width:240px;text-align:center}
-.pd-orb{position:relative;width:110px;height:110px;margin:0 auto;border-radius:50%;display:grid;place-items:center;
-  background:radial-gradient(circle at 32% 28%,#3d5dc0,#1A2E6F 70%);
-  box-shadow:0 0 0 1px rgba(255,255,255,.14),0 16px 40px rgba(0,0,0,.45)}
-.pd-orb b{font-family:'Plus Jakarta Sans';font-size:1.5rem;letter-spacing:.02em}
-.pd-orb small{position:absolute;bottom:16px;left:0;right:0;font-size:.5rem;letter-spacing:.28em;color:#9db4ea;font-weight:700}
-.pd-orb::before,.pd-orb::after{content:"";position:absolute;inset:-10px;border-radius:50%;border:1px solid rgba(143,168,238,.4);
-  animation:p-ring 2.6s var(--ease) infinite;opacity:0}
-.pd-orb::after{animation-delay:1.3s}
-.pd.thinking .pd-orb::before,.pd.thinking .pd-orb::after{animation-duration:1.1s}
-@keyframes p-ring{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.45);opacity:0}}
-.pd-extract{margin-top:1.05rem;background:#fff;color:var(--fe-text);border-radius:12px;text-align:left;
-  padding:.7rem .8rem;box-shadow:0 14px 34px rgba(0,0,0,.35);min-height:132px;
-  opacity:0;transform:translateY(10px);transition:opacity .35s var(--ease),transform .35s var(--ease)}
-.pd-extract.show{opacity:1;transform:none}
-.pd-extract .ex-t{font-size:.62rem;font-weight:800;letter-spacing:.18em;color:var(--fe-accent);margin-bottom:.35rem}
-.pd-extract .ex-t .cur{display:inline-block;width:6px;height:10px;background:var(--fe-accent);margin-left:4px;animation:p-cur 1s steps(2) infinite}
+.fstation{position:absolute;top:78px;width:224px;text-align:center;opacity:.42;z-index:2;
+  transition:opacity .45s var(--ease)}
+.fstation.on{opacity:1}
+.s0{left:18px;--sc:#1FA855}.s1{left:271px;--sc:#2D4DB3}.s2{left:524px;--sc:#FF6B35}.s3{left:777px;--sc:#13B5EA}
+
+.fnode{width:84px;height:84px;border-radius:50%;margin:0 auto;display:grid;place-items:center;position:relative;
+  font-size:2rem;color:#fff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);
+  transition:background .35s var(--ease),box-shadow .35s var(--ease),transform .35s var(--ease)}
+.fstation.on .fnode{transform:translateY(-2px)}
+.s0.on .fnode{background:radial-gradient(circle at 32% 28%,#3ad787,#128a4e);box-shadow:0 0 0 6px rgba(31,168,85,.18),0 12px 28px rgba(0,0,0,.4)}
+.s1.on .fnode{background:radial-gradient(circle at 32% 28%,#3d5dc0,#1A2E6F);box-shadow:0 0 0 6px rgba(45,77,179,.22),0 12px 28px rgba(0,0,0,.4)}
+.s2.on .fnode{background:radial-gradient(circle at 32% 28%,#ff8a5c,#e5561f);box-shadow:0 0 0 6px rgba(255,107,53,.22),0 12px 28px rgba(0,0,0,.4)}
+.s3.on .fnode{background:radial-gradient(circle at 32% 28%,#5fd0f5,#0f97c4);box-shadow:0 0 0 6px rgba(19,181,234,.22),0 12px 28px rgba(0,0,0,.4)}
+.fnode .fai{font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.35rem;letter-spacing:.02em}
+.fnode .fxm{font-family:'Plus Jakarta Sans';font-weight:900;font-size:1.7rem}
+.fstation.on .fnode::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid var(--sc);
+  opacity:0;animation:fring 1.7s ease-out infinite}
+.flow.thinking .s1.on .fnode::after{animation-duration:.95s}
+@keyframes fring{0%{transform:scale(.86);opacity:.7}100%{transform:scale(1.38);opacity:0}}
+
+.fhead{margin-top:.6rem}
+.fhead b{display:block;font-size:.92rem;color:#fff}
+.fhead span{display:block;font-size:.68rem;color:#9db4ea;margin-top:.05rem}
+
+.fcard{margin-top:.75rem;background:#fff;color:var(--fe-text);border-radius:12px;padding:.7rem .75rem;text-align:left;
+  box-shadow:0 14px 34px rgba(0,0,0,.32);min-height:158px;opacity:0;transform:translateY(12px);
+  transition:opacity .4s var(--ease),transform .4s var(--ease)}
+.fstation.on .fcard{opacity:1;transform:none}
+.fcard-t{font-size:.6rem;font-weight:800;letter-spacing:.16em;color:var(--fe-accent);margin-bottom:.4rem}
+.fcard-t .cur{display:inline-block;width:6px;height:9px;background:var(--fe-accent);margin-left:3px;animation:p-cur 1s steps(2) infinite;vertical-align:-1px}
 @keyframes p-cur{50%{opacity:0}}
-.pd-extract pre{margin:0;font-size:.68rem;line-height:1.55;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:hidden;color:#25324a}
 
-/* Outcome cards (right) */
-.pd-out{left:772px;width:228px;background:#fff;color:var(--fe-text);border-radius:12px;padding:.65rem .8rem;
-  box-shadow:0 14px 34px rgba(0,0,0,.35);opacity:.32;transform:translateX(6px);font-size:.78rem}
-.pd-out.on{opacity:1;transform:none;box-shadow:0 0 0 2px rgba(34,197,94,.5),0 14px 34px rgba(0,0,0,.35)}
-.pd-out b{display:flex;align-items:center;gap:.4rem;font-size:.85rem}
-.pd-out b i{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0}
-.pd-out.on b i{background:#22C55E;animation:p-blink 1.2s infinite}
-.pd-out span{display:block;color:var(--fe-muted);font-size:.7rem;margin-top:.15rem}
-.pd-out .res{display:none;margin-top:.35rem}
-.pd-out.on .res{display:inline-block;animation:p-pop .35s var(--ease)}
-@keyframes p-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
-.pd-out1{top:34px}.pd-out2{top:170px}.pd-out3{top:288px}
+/* Station 0 — WhatsApp */
+.fwa-doc{display:flex;align-items:center;gap:.5rem;background:rgba(11,127,111,.1);border-radius:8px;padding:.4rem .5rem}
+.fwa-pg{width:26px;height:32px;background:#fff;border:1px solid #cbd5e1;border-radius:3px;position:relative;flex-shrink:0}
+.fwa-pg::before{content:"";position:absolute;inset:5px 4px auto;height:2px;background:#94a3b8;box-shadow:0 5px 0 #cbd5e1,0 10px 0 #cbd5e1,0 15px 0 #cbd5e1}
+.fwa-pg::after{content:"✍";position:absolute;right:-2px;bottom:-4px;font-size:.7rem}
+.fwa-doc b{font-size:.78rem;line-height:1.2}.fwa-doc small{display:block;color:#6b7a8d;font-size:.62rem}
+.fwa-meta{font-size:.72rem;color:#25324a;margin-top:.45rem}
+.fwa-tick{color:#34b7f1;font-weight:700}
+.fwa-reply{margin-top:.5rem;background:#dcf8c6;border-radius:8px;padding:.45rem .55rem;font-size:.72rem;line-height:1.35;
+  opacity:0;transform:translateY(6px);transition:opacity .35s var(--ease),transform .35s var(--ease)}
+.fwa-reply.show{opacity:1;transform:none}
+.fwa-reply small{display:block;color:#6b7a8d;font-size:.6rem;margin-top:.15rem}
 
-/* Caption under the diagram */
-.pd-caption{text-align:center;color:#9db4ea;font-size:.8rem;margin-top:1.2rem;min-height:1.3em;transition:opacity .3s}
-.pd-caption.dim{opacity:0}
+/* Station 1 — AI extraction */
+.fex{margin:0;font-size:.68rem;line-height:1.55;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow:hidden;color:#25324a}
 
-/* ---- Full journey strip -------------------------------------------------- */
+/* Station 2 — 3-way match */
+.fmatch .mrow{display:flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:.78rem;margin-bottom:.5rem}
+.fmatch .mrow .lk{color:var(--fe-accent);font-size:.95rem}
+.fmatch .mrow .b{background:#eef2ff;color:var(--fe-primary-2);border-radius:6px;padding:.05rem .4rem}
+.fmatch .mline{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;padding:.2rem .1rem;
+  border-bottom:1px dashed var(--fe-border);opacity:0;transform:translateX(-6px);transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.fmatch .mline.show{opacity:1;transform:none}
+.fmatch .mline .ck{color:#15803d;font-weight:800}
+.fmatch .mline.warn .ck{color:#b45309}
+.fmatch .verdict{margin-top:.55rem}
+
+/* Station 3 — Xero */
+.fxero .xh{display:flex;align-items:center;gap:.45rem;font-weight:700;font-size:.8rem;margin-bottom:.5rem}
+.fxero .xdot{width:18px;height:18px;border-radius:50%;background:#13B5EA;color:#fff;display:grid;place-items:center;font-size:.62rem;font-weight:900;flex-shrink:0}
+.fxero .xrow{display:flex;justify-content:space-between;align-items:baseline;font-size:.78rem;padding:.15rem 0}
+.fxero .xrow b{font-family:'Plus Jakarta Sans';font-size:.9rem}
+.fxero .xrow.muted{color:var(--fe-muted);font-size:.66rem}
+.fxero .xbadge{margin-top:.55rem}
+
+.flow-caption{text-align:center;color:#9db4ea;font-size:.82rem;margin-top:1.3rem;min-height:1.3em;transition:opacity .3s}
+.flow-caption.dim{opacity:0}
+
+/* ---- Full journey strip ------------------------------------------------- */
 .pitch-journey h2{margin-bottom:.35rem}
 .pitch-journey .pj-sub{color:var(--fe-muted);font-size:.85rem;margin:0 0 1.1rem}
 .pj{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:.7rem}
@@ -109,7 +126,7 @@
 @keyframes p-heart{0%,100%{box-shadow:0 0 0 4px rgba(255,107,53,.18)}50%{box-shadow:0 0 0 9px rgba(255,107,53,.06)}}
 
 @media (prefers-reduced-motion:reduce){
-  .pd-orb::before,.pd-orb::after,.pitch-live i,.pj-step.now .ic{animation:none}
+  .pitch-live i,.fstation.on .fnode::after,.pj-step.now .ic,.fpacket{animation:none;transition:none}
 }
 </style>
 
@@ -117,58 +134,59 @@
   <span class="pitch-live"><i></i> LIVE DEMO</span>
   <div class="pitch-kicker">Starship · Globe Engineering</div>
   <h1>From site photo to accounts — automatically</h1>
-  <p class="pitch-sub">A signed delivery order is photographed on site. Starship reads it, matches it, and books it — before the driver leaves the gate.</p>
+  <p class="pitch-sub">A signed delivery order is photographed on site. It flows straight through Starship — read by AI, matched to the PO, and booked into Xero — before the driver leaves the gate.</p>
 
-  <div class="pd-wrap">
-    <div class="pd" id="pd">
-      <svg class="pd-svg" viewBox="0 0 1000 430" preserveAspectRatio="none" aria-hidden="true">
-        <line x1="252" y1="180" x2="390" y2="180"/>
-        <line x1="610" y1="130" x2="770" y2="80"/>
-        <line x1="610" y1="180" x2="770" y2="212"/>
-        <line x1="610" y1="230" x2="770" y2="330"/>
-        <circle class="pd-dot" id="dotL" r="5"><animateMotion id="amL" dur="0.9s" begin="indefinite" path="M252,180 L390,180"/></circle>
-        <circle class="pd-dot" id="dotR1" r="5"><animateMotion id="amR1" dur="0.9s" begin="indefinite" path="M610,130 L770,80"/></circle>
-        <circle class="pd-dot" id="dotR2" r="5"><animateMotion id="amR2" dur="0.9s" begin="indefinite" path="M610,180 L770,212"/></circle>
-        <circle class="pd-dot" id="dotR3" r="5"><animateMotion id="amR3" dur="0.9s" begin="indefinite" path="M610,230 L770,330"/></circle>
-      </svg>
+  <div class="flow-wrap">
+    <div class="flow" id="flow">
+      <div class="frail"><div class="frail-fill" id="railFill"></div></div>
+      <div class="fpacket" id="packet"><span>📄</span></div>
 
-      <div class="pd-node pd-wa">
-        <div class="pd-wa-head"><span class="av">St</span><div><b>Starship Hotline</b><span>online · reading your DOs</span></div></div>
-        <div class="pd-wa-body">
-          <div class="pd-msg out" id="waPhoto">
-            <div class="doc"><span class="pg"></span><div><b id="waDocName">Delivery Order</b><small id="waDocSub">signed · photo</small></div></div>
-            📎 1 photo <span class="tick">✓✓</span>
-          </div>
-          <div class="pd-msg in" id="waReply"><span id="waReplyTxt">✅ Matched</span><small>Starship · instant reply</small></div>
+      <!-- Station 0 — WhatsApp -->
+      <div class="fstation s0" id="st0">
+        <div class="fnode">💬</div>
+        <div class="fhead"><b>WhatsApp</b><span>signed DO arrives</span></div>
+        <div class="fcard fwa">
+          <div class="fwa-doc"><span class="fwa-pg"></span><div><b id="waDoc">DO 130536</b><small id="waSub">signed · photo</small></div></div>
+          <div class="fwa-meta">📎 1 photo <span class="fwa-tick">✓✓</span></div>
+          <div class="fwa-reply" id="waReply"><span id="waReplyTxt">✅ Matched</span><small>Starship · instant reply</small></div>
         </div>
       </div>
 
-      <div class="pd-node pd-ai">
-        <div class="pd-orb"><b>AI</b><small>STARSHIP</small></div>
-        <div class="pd-extract" id="extract">
-          <div class="ex-t"><span id="exTitle">EXTRACTING…</span><span class="cur"></span></div>
-          <pre id="exLines"></pre>
+      <!-- Station 1 — AI reads -->
+      <div class="fstation s1" id="st1">
+        <div class="fnode"><span class="fai">AI</span></div>
+        <div class="fhead"><b>AI reads it</b><span>OCR · every line</span></div>
+        <div class="fcard">
+          <div class="fcard-t"><span id="exTitle">READING…</span><span class="cur"></span></div>
+          <pre class="fex" id="exLines"></pre>
         </div>
       </div>
 
-      <div class="pd-node pd-out pd-out1" id="oc1">
-        <b><i></i> 3-Way Match</b>
-        <span id="oc1Sub">MR · PO · DO — line by line</span>
-        <em class="badge ok res" id="oc1Res">MATCHED</em>
+      <!-- Station 2 — Starship matches -->
+      <div class="fstation s2" id="st2">
+        <div class="fnode">🚀</div>
+        <div class="fhead"><b>Starship matches</b><span>3-way, line by line</span></div>
+        <div class="fcard fmatch">
+          <div class="mrow"><span class="b" id="mA">DO 130536</span><span class="lk">⇄</span><span class="b" id="mB">PO-0231</span></div>
+          <div id="mLines"></div>
+          <em class="badge ok verdict" id="verdict">MATCHED</em>
+        </div>
       </div>
-      <div class="pd-node pd-out pd-out2" id="oc2">
-        <b><i></i> <span id="oc2Po">Purchase Order</span></b>
-        <span id="oc2Sub">balance updated automatically</span>
-        <em class="badge brand res">RECEIPTS POSTED</em>
-      </div>
-      <div class="pd-node pd-out pd-out3" id="oc3">
-        <b><i></i> Xero</b>
-        <span>supplier bill drafted, coded to project</span>
-        <em class="badge ok res">BILL READY</em>
+
+      <!-- Station 3 — Xero -->
+      <div class="fstation s3" id="st3">
+        <div class="fnode"><span class="fxm">X</span></div>
+        <div class="fhead"><b>Booked to Xero</b><span>coded to project</span></div>
+        <div class="fcard fxero">
+          <div class="xh"><span class="xdot">X</span> Xero · Draft Bill</div>
+          <div class="xrow"><span id="xName">Seng Choon Hardware</span><b id="xAmt">RM 4,820.00</b></div>
+          <div class="xrow muted"><span id="xMeta">Project V50 · SST 6%</span></div>
+          <em class="badge ok xbadge" id="xBadge">BILL READY</em>
+        </div>
       </div>
     </div>
   </div>
-  <div class="pd-caption" id="pdCaption"></div>
+  <div class="flow-caption" id="caption"></div>
 </div>
 
 <div class="card pitch-journey">
@@ -189,95 +207,112 @@
 (function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var $ = function (id) { return document.getElementById(id); };
-  var pd = $('pd');
+  var flow = $('flow'), packet = $('packet');
+  var X = [130, 383, 636, 889];              // station centre x-coords on the rail
+  var PCT = [0, 33.3, 66.6, 100];            // rail-fill % at each station
 
-  // Two rotating scenarios so a longer demo never looks canned.
-  var SCENARIOS = [
-    { doc: 'DO 130536 — Seng Choon', sub: 'signed · GI sheets', po: 'PO-0231 · Seng Choon',
-      reply: '✅ DO 130536 matched to PO-0231 — 12 lines OK. Receipts posted.',
-      lines: ['Supplier : SENG CHOON', 'DO No    : 130536 · 18 Jul',
-              'PO Ref   : PO-0231 · V50', 'GI Sheet 1.2mm … 40 pcs ✓',
-              'Mech Coupling 2" … 24 pcs ✓', 'U-Bolt 50mm … 100 pcs ✓'] },
-    { doc: 'DO 8842 — Unique Fire', sub: 'signed · CO₂ cylinders', po: 'PO-0244 · Unique Fire',
-      reply: '⚠️ DO 8842 — 1 line short-delivered. Flagged for review.',
-      lines: ['Supplier : UNIQUE FIRE', 'DO No    : 8842 · 19 Jul',
-              'PO Ref   : PO-0244 · UOA', 'CO₂ Cylinder 5kg … 10 ✓',
-              'Pressure Gauge … 6 units ✓', 'Hose Reel 30m … 2 of 4 ⚠'] },
+  var SCEN = [
+    { wa: 'DO 130536 · Seng Choon', sub: 'signed · GI sheets',
+      ex: ['Supplier : SENG CHOON', 'DO No    : 130536 · 18 Jul', 'PO Ref   : PO-0231 · V50',
+           'GI Sheet 1.2mm … 40 ✓', 'Mech Coupling 2" … 24 ✓', 'U-Bolt 50mm … 100 ✓'],
+      mA: 'DO 130536', mB: 'PO-0231',
+      ml: [['GI Sheet  40/40', 1], ['Coupling  24/24', 1], ['U-Bolt  100/100', 1]],
+      verdict: '12 LINES MATCHED', vTone: 'ok',
+      xName: 'Seng Choon Hardware', xAmt: 'RM 4,820.00', xMeta: 'Project V50 · SST 6%',
+      xBadge: 'BILL READY', xTone: 'ok',
+      reply: '✅ DO 130536 matched to PO-0231 — 12 lines OK. Receipts posted.' },
+    { wa: 'DO 8842 · Unique Fire', sub: 'signed · CO₂ cylinders',
+      ex: ['Supplier : UNIQUE FIRE', 'DO No    : 8842 · 19 Jul', 'PO Ref   : PO-0244 · UOA',
+           'CO₂ Cylinder 5kg … 10 ✓', 'Pressure Gauge … 6 ✓', 'Hose Reel 30m … 2 of 4 ⚠'],
+      mA: 'DO 8842', mB: 'PO-0244',
+      ml: [['CO₂ Cylinder  10/10', 1], ['Pressure Gauge  6/6', 1], ['Hose Reel  2/4', 0]],
+      verdict: '1 LINE SHORT — FLAGGED', vTone: 'warn',
+      xName: 'Unique Fire Industry', xAmt: '—', xMeta: 'held — awaiting full delivery',
+      xBadge: 'HELD FOR REVIEW', xTone: 'warn',
+      reply: '⚠️ DO 8842 — 1 line short-delivered. Flagged for review.' },
   ];
+
   var si = 0, timers = [];
   function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
   function clear() { timers.forEach(clearTimeout); timers = []; }
-  function fire(id) { var el = $(id); if (el && el.beginElement) { try { el.beginElement(); } catch (e) {} } }
-  function shoot(dot, motion) {
-    var d = $(dot); d.classList.add('go'); fire(motion);
-    timers.push(setTimeout(function () { d.classList.remove('go'); }, 900));
-  }
-  function caption(t) { var c = $('pdCaption'); c.classList.add('dim');
+  function caption(t) { var c = $('caption'); c.classList.add('dim');
     setTimeout(function () { c.textContent = t; c.classList.remove('dim'); }, 250); }
+
+  function moveTo(i) { packet.classList.add('go'); packet.style.left = X[i] + 'px'; $('railFill').style.width = PCT[i] + '%'; }
+  function lightUp(i) { $('st' + i).classList.add('on'); }
 
   function type(el, lines, i, done) {
     if (i >= lines.length) { done && done(); return; }
     el.textContent += (i ? '\n' : '') + lines[i];
-    timers.push(setTimeout(function () { type(el, lines, i + 1, done); }, reduce ? 0 : 420));
+    timers.push(setTimeout(function () { type(el, lines, i + 1, done); }, reduce ? 0 : 360));
+  }
+
+  function fillStatic(s) {
+    $('waDoc').textContent = s.wa; $('waSub').textContent = s.sub;
+    $('waReplyTxt').textContent = s.reply;
+    $('exLines').textContent = ''; $('exTitle').textContent = 'READING…';
+    $('mA').textContent = s.mA; $('mB').textContent = s.mB; $('mLines').innerHTML = '';
+    var v = $('verdict'); v.textContent = s.verdict; v.className = 'badge ' + s.vTone + ' verdict';
+    $('xName').textContent = s.xName; $('xAmt').textContent = s.xAmt; $('xMeta').textContent = s.xMeta;
+    var xb = $('xBadge'); xb.textContent = s.xBadge; xb.className = 'badge ' + s.xTone + ' xbadge';
+  }
+  function paintMatchLines(s, animate) {
+    $('mLines').innerHTML = '';
+    s.ml.forEach(function (m, k) {
+      var d = document.createElement('div');
+      d.className = 'mline' + (m[1] ? '' : ' warn') + (animate ? '' : ' show');
+      d.innerHTML = '<span>' + m[0] + '</span><span class="ck">' + (m[1] ? '✓' : '⚠') + '</span>';
+      $('mLines').appendChild(d);
+      if (animate) timers.push(setTimeout(function () { d.classList.add('show'); }, 250 * k));
+    });
   }
 
   function run() {
     clear();
-    var s = SCENARIOS[si]; si = (si + 1) % SCENARIOS.length;
+    var s = SCEN[si]; si = (si + 1) % SCEN.length;
     // reset
-    ['waPhoto', 'waReply', 'extract'].forEach(function (id) { $(id).classList.remove('show'); });
-    ['oc1', 'oc2', 'oc3'].forEach(function (id) { $(id).classList.remove('on'); });
-    pd.classList.remove('thinking');
-    $('exLines').textContent = ''; $('exTitle').textContent = 'EXTRACTING…';
-    $('waDocName').textContent = s.doc; $('waDocSub').textContent = s.sub;
-    $('waReplyTxt').textContent = s.reply; $('oc2Po').textContent = s.po;
-    caption('A signed DO is photographed on site and sent to the WhatsApp hotline…');
+    [0, 1, 2, 3].forEach(function (i) { $('st' + i).classList.remove('on'); });
+    flow.classList.remove('thinking');
+    packet.classList.remove('go'); packet.style.left = X[0] + 'px'; $('railFill').style.width = '0%';
+    $('waReply').classList.remove('show');
+    fillStatic(s);
+    caption('A signed delivery order is photographed on site and sent to the Starship WhatsApp hotline…');
 
-    at(600,  function () { $('waPhoto').classList.add('show'); });
-    at(1500, function () { shoot('dotL', 'amL'); });
-    at(2300, function () {
-      pd.classList.add('thinking'); $('extract').classList.add('show');
-      caption('Starship AI reads the photo — supplier, DO number, PO reference, every line…');
-      type($('exLines'), s.lines, 0, function () { $('exTitle').textContent = 'EXTRACTED ✓'; });
-    });
-    at(5600, function () {
-      pd.classList.remove('thinking');
-      caption('…then 3-way matches it against the MR and PO, and updates everything downstream.');
-      shoot('dotR1', 'amR1'); at(350, function () { $('oc1').classList.add('on'); });
-    });
-    at(6600, function () { shoot('dotR2', 'amR2'); at(350, function () { $('oc2').classList.add('on'); }); });
-    at(7600, function () { shoot('dotR3', 'amR3'); at(350, function () { $('oc3').classList.add('on'); }); });
-    at(9000, function () {
-      $('waReply').classList.add('show');
-      caption('The site team gets the verdict back in WhatsApp — seconds after sending the photo.');
-    });
-    at(13500, run);
+    at(500,  function () { packet.classList.add('go'); lightUp(0); });
+    at(1600, function () { moveTo(1);
+      caption('Starship AI reads the photo — supplier, DO number, PO reference, every line.'); });
+    at(2500, function () { lightUp(1); flow.classList.add('thinking');
+      type($('exLines'), s.ex, 0, function () { $('exTitle').textContent = 'EXTRACTED ✓'; }); });
+    at(5000, function () { flow.classList.remove('thinking'); moveTo(2);
+      caption('It 3-way matches the delivery against the original purchase order — line by line.'); });
+    at(5900, function () { lightUp(2); paintMatchLines(s, true); });
+    at(7300, function () { moveTo(3);
+      caption('The verified bill is drafted straight into Xero, coded to the project.'); });
+    at(8200, function () { lightUp(3); });
+    at(9200, function () { $('waReply').classList.add('show');
+      caption('Seconds later, the site team gets the result back in WhatsApp — nothing re-keyed.'); });
+    at(13800, run);
   }
 
   // Journey strip — its own gentle loop.
   var steps = Array.prototype.slice.call(document.querySelectorAll('#pj .pj-step'));
   var ji = 0;
   function journey() {
-    steps.forEach(function (st, i) {
-      st.classList.toggle('now', i === ji);
-      st.classList.toggle('done', i < ji);
-    });
+    steps.forEach(function (st, i) { st.classList.toggle('now', i === ji); st.classList.toggle('done', i < ji); });
     $('pjFill').style.width = (ji / (steps.length - 1) * 94) + '%';
-    ji = (ji + 1) % (steps.length + 1);   // one extra beat: all-done pause
+    ji = (ji + 1) % (steps.length + 1);
     if (ji === 0) steps.forEach(function (st) { st.classList.add('done'); });
     setTimeout(journey, ji === 0 ? 2600 : 1900);
   }
 
   if (reduce) {
-    // Static final state for reduced motion.
-    ['waPhoto', 'waReply', 'extract'].forEach(function (id) { $(id).classList.add('show'); });
-    ['oc1', 'oc2', 'oc3'].forEach(function (id) { $(id).classList.add('on'); });
-    var s0 = SCENARIOS[0];
-    $('waDocName').textContent = s0.doc; $('waDocSub').textContent = s0.sub;
-    $('waReplyTxt').textContent = s0.reply; $('oc2Po').textContent = s0.po;
-    $('exLines').textContent = s0.lines.join('\n'); $('exTitle').textContent = 'EXTRACTED ✓';
-    steps.forEach(function (st) { st.classList.add('done'); });
-    $('pjFill').style.width = '94%';
+    var s0 = SCEN[0];
+    fillStatic(s0); paintMatchLines(s0, false);
+    $('exLines').textContent = s0.ex.join('\n'); $('exTitle').textContent = 'EXTRACTED ✓';
+    [0, 1, 2, 3].forEach(lightUp);
+    packet.classList.add('go'); packet.style.left = X[3] + 'px'; $('railFill').style.width = '100%';
+    $('waReply').classList.add('show');
+    steps.forEach(function (st) { st.classList.add('done'); }); $('pjFill').style.width = '94%';
   } else {
     run(); journey();
   }
