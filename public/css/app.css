@@ -561,3 +561,49 @@ td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
 .sl-msg span{animation:sl-msg-in .32s var(--ease)}
 .sl-sub{color:var(--fe-muted);font-size:.78rem;margin-top:-.35rem}
 @keyframes sl-msg-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* Live dashboard — heartbeat pulse, pipeline strip, live refresh ---------- */
+.live-pill{position:absolute;top:1.1rem;right:1.25rem;z-index:2;display:inline-flex;align-items:center;gap:.45rem;
+  font-size:.7rem;font-weight:700;letter-spacing:.08em;color:#9fe8b8;background:rgba(34,197,94,.14);
+  border:1px solid rgba(34,197,94,.4);padding:.28rem .7rem;border-radius:999px;white-space:nowrap}
+.live-pill i,.live-dot{width:8px;height:8px;border-radius:50%;background:#22C55E;display:inline-block;
+  animation:live-blink 1.5s infinite}
+@keyframes live-blink{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5);opacity:1}50%{box-shadow:0 0 0 6px rgba(34,197,94,0);opacity:.7}}
+
+.pulse-card{margin-top:1.25rem;margin-bottom:0}
+.pulse-note{display:inline-flex;align-items:center;gap:.5rem;color:var(--fe-muted);font-size:.78rem}
+.pipeline{display:flex;align-items:stretch;gap:.15rem;margin-top:.9rem;overflow-x:auto;padding-bottom:.25rem}
+.pl-stage{flex:1;min-width:108px;text-align:center;padding:.8rem .4rem .7rem;border-radius:12px;
+  border:1px solid transparent;transition:background .15s var(--ease),border-color .15s var(--ease),transform .15s var(--ease)}
+.pl-stage:hover{background:#f7f9ff;border-color:var(--fe-border);text-decoration:none;transform:translateY(-2px)}
+.pl-ecg{display:block;height:20px;margin:0 auto .3rem;width:64px}
+.pl-ecg svg{width:100%;height:100%;overflow:visible}
+.pl-ecg polyline{fill:none;stroke:var(--fe-primary-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:120;stroke-dashoffset:120;animation:ecg-draw 2.2s linear infinite}
+@keyframes ecg-draw{0%{stroke-dashoffset:120;opacity:0}8%{opacity:1}55%{stroke-dashoffset:0;opacity:1}80%{opacity:.25}100%{stroke-dashoffset:0;opacity:0}}
+.pl-stage.good .pl-ecg polyline{stroke:#22C55E}
+.pl-stage.bad .pl-ecg polyline{stroke:#EF4444;animation-duration:1.2s}
+.pl-stage.calm .pl-ecg polyline{stroke:#cbd5e1;animation-duration:4s}
+.pl-num{display:block;font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.5rem;color:var(--fe-primary);line-height:1.15}
+.pl-stage.bad .pl-num{color:#b91c1c}
+.pl-stage.calm .pl-num{color:#94a3b8}
+.pl-lbl{display:block;font-size:.78rem;font-weight:600;color:var(--fe-text)}
+.pl-sub{display:block;font-size:.66rem;color:var(--fe-muted)}
+.pl-link{position:relative;flex:0 0 34px;align-self:center;height:2px;margin-top:-1.4rem;
+  background-image:linear-gradient(90deg,#cbd5e1 55%,transparent 0);background-size:7px 2px}
+.pl-link i{position:absolute;top:-2.5px;left:0;width:7px;height:7px;border-radius:50%;background:var(--fe-accent);
+  box-shadow:0 0 6px rgba(255,107,53,.7);animation:pl-travel 2.4s linear infinite}
+@keyframes pl-travel{0%{left:-4px;opacity:0}12%{opacity:1}88%{opacity:1}100%{left:calc(100% - 3px);opacity:0}}
+.pl-link:nth-of-type(4) i{animation-delay:.4s}.pl-link:nth-of-type(8) i{animation-delay:.8s}
+.pl-link:nth-of-type(12) i{animation-delay:1.2s}.pl-link:nth-of-type(16) i{animation-delay:1.6s}
+.pl-link:nth-of-type(20) i{animation-delay:2s}
+
+.stat.kpi.beat{animation:kpi-beat 1.6s var(--ease) infinite}
+@keyframes kpi-beat{0%,100%{box-shadow:var(--shadow-sm)}50%{box-shadow:0 0 0 5px rgba(220,38,38,.10),var(--shadow-sm)}}
+.num-flash{animation:num-flash .8s var(--ease)}
+@keyframes num-flash{0%{color:var(--fe-accent);text-shadow:0 0 12px rgba(255,107,53,.45)}100%{text-shadow:none}}
+
+@media (prefers-reduced-motion:reduce){
+  .live-pill i,.live-dot,.pl-ecg polyline,.pl-link i,.stat.kpi.beat{animation:none}
+  .pl-ecg polyline{stroke-dashoffset:0}
+}

@@ -145,4 +145,23 @@ final class DashboardRepo
                 : $s("SELECT COUNT(*) FROM requisitions WHERE status IN " . self::OPEN . $sc),
         ];
     }
+
+    /**
+     * Stage counters for the live "pipeline pulse" strip: how much work is
+     * sitting at each step of MR → approval → PO → delivery → match right now.
+     * Same project scoping as the KPIs so nothing leaks across projects.
+     */
+    public static function pulse(): array
+    {
+        [$sc, $sa] = self::scope('project_id');
+        $s = fn(string $sql, array $p = []) => (int)Db::scalar($sql, array_merge($p, $sa));
+        return [
+            'mr_draft'    => $s("SELECT COUNT(*) FROM requisitions WHERE status = 'draft'{$sc}"),
+            'mr_approved' => $s("SELECT COUNT(*) FROM requisitions WHERE status IN ('approved','partially_ordered'){$sc}"),
+            'po_open'     => $s("SELECT COUNT(*) FROM purchase_orders WHERE status IN ('issued','partially_received'){$sc}"),
+            'do_review'   => $s("SELECT COUNT(*) FROM delivery_orders WHERE status IN ('received','needs_review'){$sc}"),
+            'do_matched'  => $s("SELECT COUNT(*) FROM delivery_orders WHERE status = 'matched'{$sc}"),
+            'exceptions'  => $s("SELECT COUNT(*) FROM delivery_orders WHERE status = 'exception'{$sc}"),
+        ];
+    }
 }

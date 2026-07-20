@@ -37,6 +37,7 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
       <?php // Requesters do see POs and DOs for their projects — just not the money on them. ?>
       <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
       <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
+      <?php $nav('/pitch', 'How it works', Icons::svg('spark')); ?>
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
         <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>

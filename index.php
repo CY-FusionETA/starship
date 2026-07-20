@@ -99,7 +99,22 @@ $r->get('/', function () {
         'upcoming' => DashboardRepo::upcomingDeliveries(8),
         'overdue'  => DashboardRepo::overdue(8),
         'mine'     => $isAdmin ? [] : DashboardRepo::myOpen($uid, 8),
+        'pulse'    => DashboardRepo::pulse(),
     ], 'Dashboard');
+});
+// Live KPI + pipeline feed — polled by the dashboard's heartbeat refresh.
+$r->get('/dashboard/pulse.json', function () {
+    Auth::require();
+    Response::json([
+        'kpis'  => DashboardRepo::kpis((int)(Auth::id() ?? 0)),
+        'pulse' => DashboardRepo::pulse(),
+    ]);
+});
+
+// --- How it works (animated client-pitch showcase) ------------------
+$r->get('/pitch', function () {
+    Auth::require();
+    Response::view('pitch', [], 'How it works');
 });
 
 // --- Approvals (superadmin inbox: incoming requisition requests) -----
