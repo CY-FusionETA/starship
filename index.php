@@ -317,6 +317,8 @@ $r->get('/requisitions/new', function () {
         'projects'  => ProjectRepo::allForUser(),
         'catalogue' => CatalogueRepo::all(),
         'suppliers' => SupplierRepo::active(),
+        'nextMr'    => RequisitionRepo::nextMrNumber(),
+        'error'     => $_GET['err'] ?? null,
     ], 'New requisition');
 });
 $r->post('/requisitions/save', function () {
@@ -325,6 +327,15 @@ $r->post('/requisitions/save', function () {
     // The picker only offers your projects, but the field is still a POST value.
     if (!Perm::canSeeProject((int)($_POST['project_id'] ?? 0))) {
         Response::redirect('/requisitions/new?err=' . rawurlencode('Pick a project you are assigned to.'));
+    }
+    // mr_number is UNIQUE — without this the insert throws and the whole form is lost.
+    $mrNo = trim((string)($_POST['mr_number'] ?? ''));
+    if ($mrNo === '' || RequisitionRepo::mrNumberTaken($mrNo)) {
+        Response::redirect('/requisitions/new?err=' . rawurlencode(
+            $mrNo === ''
+                ? 'Enter an MR number.'
+                : "MR number {$mrNo} is already used — the next free one is " . RequisitionRepo::nextMrNumber() . '.'
+        ));
     }
     $id = RequisitionRepo::create($_POST, $_POST['lines'] ?? []);
     // Quotations ride along with the form — a rejected file never blocks the MR itself.
@@ -412,6 +423,7 @@ $r->get('/requisitions/{id}/edit', function ($p) {
         'req'         => $req,
         'lines'       => RequisitionRepo::lines((int)$p['id']),
         'attachments' => RequisitionRepo::attachments((int)$p['id']),
+        'error'       => $_GET['err'] ?? null,
     ], 'Edit MR ' . $req['mr_number']);
 });
 $r->post('/requisitions/{id}/update', function ($p) {
@@ -423,6 +435,13 @@ $r->post('/requisitions/{id}/update', function ($p) {
     // Can't move a requisition into a project you don't have.
     if (!Perm::canSeeProject((int)($_POST['project_id'] ?? 0))) {
         Response::redirect('/requisitions/' . $id . '/edit?err=' . rawurlencode('Pick a project you are assigned to.'));
+    }
+    // Same UNIQUE guard as create — renaming onto another MR's number would throw.
+    $mrNo = trim((string)($_POST['mr_number'] ?? ''));
+    if ($mrNo === '' || RequisitionRepo::mrNumberTaken($mrNo, $id)) {
+        Response::redirect('/requisitions/' . $id . '/edit?err=' . rawurlencode(
+            $mrNo === '' ? 'Enter an MR number.' : "MR number {$mrNo} is already used by another requisition."
+        ));
     }
     RequisitionRepo::update($id, $_POST, $_POST['lines'] ?? []);
     $err = '';

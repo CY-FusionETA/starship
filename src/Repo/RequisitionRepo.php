@@ -15,6 +15,34 @@ final class RequisitionRepo
     public const ATTACH_EXTS = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
     public const ATTACH_MAX_BYTES = 15 * 1024 * 1024;
 
+    /** True when this MR number is already used (optionally ignoring one row, for edits). */
+    public static function mrNumberTaken(string $mrNumber, ?int $ignoreId = null): bool
+    {
+        $sql = "SELECT COUNT(*) FROM requisitions WHERE mr_number = ?";
+        $p   = [trim($mrNumber)];
+        if ($ignoreId !== null) { $sql .= " AND id <> ?"; $p[] = $ignoreId; }
+        return (int)Db::scalar($sql, $p) > 0;
+    }
+
+    /**
+     * The next free MR number, for prefilling the form.
+     *
+     * mr_number is free text (some are entered by hand from the paper form), so
+     * only the purely numeric ones can be counted on. Non-numeric numbers are
+     * ignored rather than guessed at.
+     */
+    public static function nextMrNumber(): string
+    {
+        $max = 0;
+        foreach (Db::all("SELECT mr_number FROM requisitions") as $r) {
+            $n = trim((string)$r['mr_number']);
+            if (ctype_digit($n)) $max = max($max, (int)$n);
+        }
+        $next = $max + 1;
+        while (self::mrNumberTaken((string)$next)) $next++;
+        return (string)$next;
+    }
+
     public static function find(int $id): ?array
     {
         return Db::one(

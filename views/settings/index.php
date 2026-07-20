@@ -11,7 +11,20 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
 <?php if ($notice): ?><div class="notice"><?= e($notice) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
 
-<div class="settings-grid">
+<?php // Tabs, not columns: side by side these three cards were wider than the
+      // viewport, so WhatsApp sat off the right edge with no way to reach it. ?>
+<div class="settings-tabs" role="tablist">
+  <button type="button" class="stab" role="tab" data-pane="xero" aria-selected="true">
+    Xero <span class="conn-dot <?= $connected ? 'on' : 'off' ?>"></span>
+  </button>
+  <button type="button" class="stab" role="tab" data-pane="wazzup" aria-selected="false">
+    WhatsApp <span class="conn-dot <?= ($wz_enabled && $wz_configured) ? 'on' : 'off' ?>"></span>
+  </button>
+  <button type="button" class="stab" role="tab" data-pane="users" aria-selected="false">Users</button>
+</div>
+
+<div class="settings-panes">
+<section class="tab-pane" id="pane-xero" role="tabpanel">
 <div class="card xero-card">
   <div class="xero-head">
     <div class="xero-title">
@@ -98,7 +111,9 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
     </ol>
   </details>
 </div>
+</section>
 
+<section class="tab-pane" id="pane-wazzup" role="tabpanel" hidden>
 <div class="card xero-card" id="wazzup">
   <div class="xero-head">
     <div class="xero-title">
@@ -177,7 +192,10 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
   </div>
 </div>
 
+</section>
+
 <!-- ------------------------------- Users ------------------------------- -->
+<section class="tab-pane" id="pane-users" role="tabpanel" hidden>
 <div class="card" id="users">
   <h2 style="margin-top:0">Users &amp; project access</h2>
   <p class="muted small" style="margin-top:0">
@@ -275,9 +293,29 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
     </div>
   </form>
 </div>
+</section>
 </div>
 
 <script>
+// Tab switching. Driven by the hash so the existing post-save redirects
+// (/settings?ok=...#users, #wazzup) still land on the right tab.
+function showTab(name, push){
+  const panes = ['xero','wazzup','users'];
+  if (!panes.includes(name)) name = 'xero';
+  panes.forEach(p => document.getElementById('pane-' + p).hidden = (p !== name));
+  document.querySelectorAll('.stab').forEach(b => {
+    const on = b.dataset.pane === name;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  if (push) history.replaceState(null, '', '#' + name);
+}
+document.querySelectorAll('.stab').forEach(b =>
+  b.addEventListener('click', () => showTab(b.dataset.pane, true)));
+// #users and #wazzup are the anchors the server redirects to; anything else = Xero.
+showTab((location.hash || '').replace('#',''), false);
+window.addEventListener('hashchange', () => showTab((location.hash||'').replace('#',''), false));
+
 function copyEl(id,btn){
   const el = document.getElementById(id); el.select(); el.setSelectionRange(0,99999);
   navigator.clipboard?.writeText(el.value); const t=btn.textContent; btn.textContent='Copied ✓';

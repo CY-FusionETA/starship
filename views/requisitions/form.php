@@ -1,4 +1,5 @@
-<?php /** @var array $projects @var ?array $req @var ?array $lines @var ?array $attachments */
+<?php /** @var array $projects @var ?array $req @var ?array $lines @var ?array $attachments
+ * @var ?string $nextMr @var ?string $error */
 use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 $editing = !empty($req);
@@ -23,6 +24,8 @@ if ($editing) {
 <h1 style="margin-bottom:.2rem"><?= $editing ? 'Edit Material Requisition' : 'New Material Requisition' ?></h1>
 <p class="muted small" style="margin-top:0">Form GE(S)-PU-F01/1 — search the catalogue and add parts to the requisition.</p>
 
+<?php if (!empty($error)): ?><div class="alert"><?= e($error) ?></div><?php endif; ?>
+
 <form id="mrForm" method="post" action="<?= e($base . $action) ?>" enctype="multipart/form-data">
   <?= Csrf::field() ?>
 
@@ -39,7 +42,7 @@ if ($editing) {
   <div class="card">
     <div class="mr-fields">
       <div class="row">
-        <div style="flex:0 1 150px;min-width:120px"><label>MR No. *</label><input name="mr_number" required placeholder="48" value="<?= $editing ? e($req['mr_number']) : '' ?>"></div>
+        <div style="flex:0 1 150px;min-width:120px"><label>MR No. *</label><input name="mr_number" required placeholder="48" value="<?= $editing ? e($req['mr_number']) : e($nextMr ?? '') ?>"></div>
         <div style="flex:3"><label>Project *</label>
           <select name="project_id" required>
             <option value="">— select project —</option>

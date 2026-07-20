@@ -39,6 +39,39 @@ ini_set('display_errors', $isProd ? '0' : '1');
 ini_set('log_errors', '1');
 ini_set('error_log', STORAGE_ROOT . '/logs/php-error.log');
 
+/**
+ * An uncaught exception must never reach the browser as a blank 500 — that is
+ * what a failed save looked like before: the work was lost with nothing on
+ * screen to say why. Log the full trace, then render the normal error view so
+ * the user still has the nav and can get back to what they were doing.
+ */
+if (PHP_SAPI !== 'cli') {
+    set_exception_handler(function (Throwable $ex) use ($isProd): void {
+        error_log('Uncaught ' . get_class($ex) . ': ' . $ex->getMessage()
+            . ' in ' . $ex->getFile() . ':' . $ex->getLine() . "\n" . $ex->getTraceAsString());
+
+        while (ob_get_level() > 0) ob_end_clean();   // drop a half-rendered page
+        if (!headers_sent()) http_response_code(500);
+
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+        if (str_ends_with($path, '.json') || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => 'Something went wrong on our end.']);
+            return;
+        }
+
+        // Off production the real message is far more useful than a polite one.
+        $msg = $isProd
+            ? 'Something went wrong on our end. Nothing was saved — please try again, and tell Simon if it keeps happening.'
+            : get_class($ex) . ': ' . $ex->getMessage();
+        try {
+            App\Response::view('error', ['message' => $msg], 'Error');
+        } catch (Throwable $_) {
+            echo '<h1>Something went wrong</h1><p>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+    });
+}
+
 /** Global config accessor. */
 function cfg(string $path, $default = null) {
     $parts = explode('.', $path);

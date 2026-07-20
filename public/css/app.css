@@ -449,9 +449,20 @@ td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
 
 /* Settings — Xero card */
 .xero-card{max-width:760px}
-.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start}
-.settings-grid .xero-card{max-width:none;margin:0}
-@media (max-width:960px){.settings-grid{grid-template-columns:1fr}}
+/* Settings tabs — Xero / WhatsApp / Users. These were side-by-side columns, but
+   the cards' min-content width (wide tables, the webhook URL) blew the grid out
+   past the viewport and pushed WhatsApp off-screen. One pane at a time can't. */
+.settings-tabs{display:flex;gap:.4rem;border-bottom:1px solid var(--fe-border);margin:0 0 1.2rem;flex-wrap:wrap}
+.stab{display:flex;align-items:center;gap:.45rem;background:none;border:none;border-bottom:2px solid transparent;
+  padding:.6rem .9rem;font:inherit;font-weight:600;color:var(--fe-muted);cursor:pointer;transition:color .12s var(--ease)}
+.stab:hover{color:var(--fe-primary-2)}
+.stab.on{color:var(--fe-primary);border-bottom-color:var(--fe-primary-2)}
+.conn-dot{width:.5rem;height:.5rem;border-radius:999px;flex-shrink:0}
+.conn-dot.on{background:#16a34a}
+.conn-dot.off{background:#cbd5e1}
+.settings-panes{min-width:0}
+.settings-panes .xero-card{max-width:none;margin:0}
+.settings-panes table{width:100%}
 .xero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;
   padding-bottom:1rem;border-bottom:1px solid var(--fe-border);margin-bottom:1rem}
 .xero-title{display:flex;gap:.8rem;align-items:center}
@@ -469,8 +480,9 @@ td.empty-cell{color:var(--fe-muted);padding:1.6rem 1rem;text-align:center}
 .switch-row{display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .4rem}
 .switch-row input{width:auto;margin:0}
 .switch-row span{font-weight:600}
-.copy-field{display:flex;gap:.5rem;align-items:center}
-.copy-field input{font-family:ui-monospace,monospace;font-size:.85rem;background:#f8fafc}
+/* min-width:0 so a long webhook URL wraps instead of widening the whole page. */
+.copy-field{display:flex;gap:.5rem;align-items:center;min-width:0}
+.copy-field input{font-family:ui-monospace,monospace;font-size:.85rem;background:#f8fafc;min-width:0;flex:1}
 .xero-actions{display:flex;gap:.7rem;align-items:center;margin-top:1.3rem;flex-wrap:wrap}
 .xero-help{margin-top:1.2rem;border-top:1px solid var(--fe-border);padding-top:.9rem}
 .xero-help summary{cursor:pointer;font-weight:600;color:var(--fe-primary-2)}
