@@ -3,11 +3,14 @@ use App\Csrf;
 $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 // One-click demo logins. These credentials are public to anyone who opens the
 // page — keep the accounts on demo data only.
+// Password defaults to demo123; accounts added later use their own.
 $demoUsers = [
     // Labels track the account's real role — see App\Perm::LABELS.
     ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin',  'initials' => 'SC'],
     ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin',  'initials' => 'CA'],
     ['email' => 'procurement@fusioneta.com', 'name' => 'Procurement', 'role' => 'Procurement', 'initials' => 'PR'],
+    ['email' => 'pm@fusioneta.com',     'name' => 'Project Manager', 'role' => 'Project Manager', 'initials' => 'PM', 'password' => 'demodemo123'],
+    ['email' => 'finance@fusioneta.com', 'name' => 'Finance', 'role' => 'Finance', 'initials' => 'FI', 'password' => 'demodemo123'],
     ['email' => 'mr@fusioneta.com',     'name' => 'MR',     'role' => 'Requester',   'initials' => 'MR'],
 ];
 $demoPassword = 'demo123'; ?>
@@ -37,7 +40,7 @@ $demoPassword = 'demo123'; ?>
     <div class="demo-grid">
       <?php foreach ($demoUsers as $u): ?>
         <button type="button" class="demo-btn"
-                onclick="demoLogin('<?= e($u['email']) ?>')"
+                onclick="demoLogin('<?= e($u['email']) ?>', '<?= e($u['password'] ?? $demoPassword) ?>')"
                 title="<?= e($u['email']) ?>">
           <span class="demo-av"><?= e($u['initials']) ?></span>
           <span class="demo-who">
@@ -53,9 +56,9 @@ $demoPassword = 'demo123'; ?>
 // Fill the real fields and submit the real form, so the demo path goes through
 // exactly the same POST /login (and CSRF check) as typing the details by hand.
 const DEMO_PASSWORD = <?= json_encode($demoPassword) ?>;
-function demoLogin(email){
+function demoLogin(email, password){
   document.getElementById('email').value = email;
-  document.getElementById('password').value = DEMO_PASSWORD;
+  document.getElementById('password').value = password || DEMO_PASSWORD;
   document.querySelector('.login-card').submit();
 }
 </script>
