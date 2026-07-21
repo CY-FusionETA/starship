@@ -6,7 +6,6 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 // Password defaults to demo123; accounts added later use their own.
 $demoUsers = [
     // Labels track the account's real role — see App\Perm::LABELS.
-    ['email' => 'simon@fusioneta.com',  'name' => 'Simon',  'role' => 'Superadmin',  'initials' => 'SC'],
     ['email' => 'carmen@globe.com',     'name' => 'Carmen', 'role' => 'Superadmin',  'initials' => 'CA'],
     ['email' => 'procurement@fusioneta.com', 'name' => 'Procurement', 'role' => 'Procurement', 'initials' => 'PR'],
     ['email' => 'pm@fusioneta.com',     'name' => 'Project Manager', 'role' => 'Project Manager', 'initials' => 'PM', 'password' => 'demodemo123'],
