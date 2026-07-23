@@ -7,7 +7,11 @@
   var BASE = CFG.base || '';
   var KEY = 'starship_tour_step';
 
+  var SEEN = 'starship_tour_seen';
+  function markSeen() { try { localStorage.setItem(SEEN, '1'); } catch (e) {} }
+
   window.starshipTourStart = function () {
+    markSeen();
     try { sessionStorage.setItem(KEY, '0'); } catch (e) {}
     post(BASE + '/tour/start');
   };
@@ -22,7 +26,20 @@
     f.appendChild(i); document.body.appendChild(f); f.submit();
   }
 
-  if (!CFG.active) return;
+  // First-timer nudge: show the "take the tour" tip until it's used or dismissed.
+  if (!CFG.active) {
+    var tip = document.getElementById('stourTip');
+    var seen = false;
+    try { seen = localStorage.getItem(SEEN) === '1'; } catch (e) {}
+    if (tip && !seen) {
+      tip.style.display = '';
+      var goBtn = document.getElementById('stourTipGo');
+      var xBtn = document.getElementById('stourTipX');
+      if (goBtn) goBtn.onclick = window.starshipTourStart;
+      if (xBtn) xBtn.onclick = function () { markSeen(); tip.style.display = 'none'; };
+    }
+    return;
+  }
 
   try {
     var qp = new URLSearchParams(location.search);
@@ -59,7 +76,8 @@
       html: "<p>Your delivery shows here. Click <b>Review</b> on the row to open it — Starship has already lined the DO up against the PO (the <b>3-way match</b>). Adjust anything received short or damaged, then <b>Confirm receipt</b>. That closes the loop back to the PO.</p>" },
 
     { role: 'Admin', title: 'The rest of the system', go: '/', goLabel: 'Dashboard', target: 'nav',
-      html: "<p>That's the core loop! The nav also holds your <b>master data</b> — catalogue, suppliers, projects — and (for admins) <b>Settings</b>: users, roles and the WhatsApp hotline. Explore freely; it's all still sample data.</p>" },
+      html: "<p>That's the core loop! The nav also holds your <b>master data</b> — catalogue, suppliers, projects — and (for admins) <b>Settings</b>: users, roles and the WhatsApp hotline. Explore freely; it's all still sample data.</p>" +
+            "<p style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.45rem .6rem;font-size:.84rem'>💡 <b>Extra tip:</b> when you're ready for the accounting side, an admin can connect your own <b>Xero organisation</b> under <b>Settings → Xero</b>. After that, approving a requisition also raises the PO straight into Xero. (That's a live setup — not part of this practice run.)</p>" },
 
     { role: 'Done', title: "You've done the whole flow 🎉",
       html: "<p>Requisition → approval → PO → delivery → 3-way match. That's Starship end to end.</p><p>Click <b>Finish</b> to leave Training Mode and return to your live data. You can retake the tour anytime from the sidebar.</p>", last: true }

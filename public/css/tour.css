@@ -73,5 +73,16 @@
 .stour-lb p{color:#4b5563;font-size:.9rem;margin:.2rem 0 .7rem}
 .stour-lb img{width:100%;border:1px solid #e5e7eb;border-radius:10px}
 .stour-lb .x{margin-top:.7rem}
+/* First-timer nudge toward the tour */
+.stour-tip{display:flex;align-items:center;gap:.7rem;margin:0 0 1rem;padding:.7rem .9rem;
+  background:linear-gradient(90deg,#eef2ff,#f5f3ff);border:1px solid #ddd6fe;border-radius:12px}
+.stour-tip .ti{font-size:1.3rem;line-height:1}
+.stour-tip .tx{flex:1;font-size:.88rem;color:#3730a3;line-height:1.45}
+.stour-tip .tx b{color:#4c1d95}
+.stour-tip .stour-btn.primary{white-space:nowrap}
+.stour-tip-x{background:transparent;border:0;color:#8b8fa3;font-size:1.3rem;line-height:1;cursor:pointer;padding:.1rem .3rem;border-radius:6px}
+.stour-tip-x:hover{background:rgba(0,0,0,.06);color:#4b5563}
+@media (max-width:640px){ .stour-tip{flex-wrap:wrap} .stour-tip .tx{flex-basis:100%} }
+
 @media (max-width:520px){ .stour-panel{right:8px;left:8px;bottom:8px;width:auto} }
 @media (prefers-reduced-motion:reduce){ .stour-panel,.stour-banner .dot{animation:none} }

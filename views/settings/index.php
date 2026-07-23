@@ -1,5 +1,5 @@
 <?php /** @var ?array $token @var bool $connected @var bool $configured @var bool $enabled
- * @var string $client_id @var bool $has_secret @var string $redirect_uri @var string $scopes
+ * @var bool $has_client_id @var bool $has_secret @var string $redirect_uri @var string $scopes
  * @var bool $wz_configured @var bool $wz_enabled @var string $wz_api_key @var string $wz_channel
  * @var string $wz_number @var string $wz_webhook @var array $senders
  * @var ?string $autosync_last @var ?string $notice @var ?string $error */
@@ -67,6 +67,14 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
     </div>
   <?php endif; ?>
 
+  <style>
+    .xero-advanced{margin-top:.6rem;border:1px solid #e6e8f0;border-radius:10px;background:#fafbfe}
+    .xero-advanced > summary{cursor:pointer;font-weight:600;font-size:.9rem;padding:.6rem .8rem;list-style:none;color:#374151}
+    .xero-advanced > summary::-webkit-details-marker{display:none}
+    .xero-advanced > summary::before{content:'▸ ';color:#9aa2b1}
+    .xero-advanced[open] > summary::before{content:'▾ '}
+    .xero-advanced .adv-body{padding:0 .8rem .8rem}
+  </style>
   <form method="post" action="<?= e($base) ?>/settings/save" class="xero-form">
     <?= Csrf::field() ?>
     <label class="switch-row">
@@ -74,42 +82,52 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/'); ?>
       <span>Enable Xero auto-sync</span>
     </label>
 
-    <div class="row">
-      <div><label>Client ID</label><input name="client_id" value="<?= e($client_id) ?>" placeholder="from your Xero app" autocomplete="off"></div>
-      <div><label>Client Secret</label><input name="client_secret" type="password" placeholder="<?= $has_secret ? '•••••• (leave blank to keep)' : 'from your Xero app' ?>" autocomplete="off"></div>
-    </div>
+    <?php if (!$connected): ?>
+      <div class="xero-actions" style="margin-top:.7rem">
+        <?php if ($configured): ?>
+          <a class="btn" href="<?= e($base) ?>/settings/xero/connect">Connect your Xero organisation →</a>
+          <span class="muted small">Authorise Starship to your Xero org — you choose which one.</span>
+        <?php else: ?>
+          <span class="muted small">Add your Xero app credentials under <strong>Advanced setup</strong> below, click <strong>Save</strong>, then connect.</span>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
 
-    <label>Redirect URI <span class="muted small">— add this exact URL to your Xero app’s “Redirect URIs”</span></label>
-    <div class="copy-field">
-      <input name="redirect_uri" id="redir" value="<?= e($redirect_uri) ?>">
-      <button type="button" class="btn sm secondary" onclick="copyRedir()">Copy</button>
-    </div>
+    <details class="xero-advanced">
+      <summary>Advanced setup — Xero app credentials <span class="muted small" style="font-weight:400">(one-time; rarely needed)</span></summary>
+      <div class="adv-body">
+        <p class="muted small" style="margin:.2rem 0 .7rem">These come from your Xero developer app and are set once. The saved <strong>Client ID</strong> and <strong>Secret</strong> are masked here so they can't be read off this screen — leave them blank to keep the stored values.</p>
 
-    <label>Supplier contact group <span class="muted small">— optional. Contacts in this Xero contact group are imported as suppliers even before their first PO. Clear to import only Xero-flagged suppliers.</span></label>
-    <input name="supplier_group" value="<?= e($supplier_group) ?>" placeholder="Suppliers">
+        <div class="row">
+          <div><label>Client ID</label><input name="client_id" type="password" placeholder="<?= $has_client_id ? '•••••• (set — leave blank to keep)' : 'from your Xero app' ?>" autocomplete="off"></div>
+          <div><label>Client Secret</label><input name="client_secret" type="password" placeholder="<?= $has_secret ? '•••••• (set — leave blank to keep)' : 'from your Xero app' ?>" autocomplete="off"></div>
+        </div>
 
-    <label>Scopes</label>
-    <input name="scopes" value="<?= e($scopes) ?>">
+        <label>Redirect URI <span class="muted small">— add this exact URL to your Xero app’s “Redirect URIs”</span></label>
+        <div class="copy-field">
+          <input name="redirect_uri" id="redir" value="<?= e($redirect_uri) ?>">
+          <button type="button" class="btn sm secondary" onclick="copyRedir()">Copy</button>
+        </div>
+
+        <label>Supplier contact group <span class="muted small">— optional. Contacts in this Xero contact group are imported as suppliers even before their first PO. Clear to import only Xero-flagged suppliers.</span></label>
+        <input name="supplier_group" value="<?= e($supplier_group) ?>" placeholder="Suppliers">
+
+        <label>Scopes</label>
+        <input name="scopes" value="<?= e($scopes) ?>">
+
+        <ol class="muted small" style="margin-top:.8rem">
+          <li>Go to <strong>developer.xero.com → My Apps → New app</strong> (Web app).</li>
+          <li>Set the <strong>Redirect URI</strong> to the exact URL above.</li>
+          <li>Copy the <strong>Client ID</strong> and generate a <strong>Client Secret</strong>; paste both here and Save.</li>
+          <li>Then use <strong>Connect your Xero organisation</strong> above.</li>
+        </ol>
+      </div>
+    </details>
 
     <div class="xero-actions">
       <button class="btn secondary">Save</button>
-      <?php if ($configured): ?>
-        <a class="btn" href="<?= e($base) ?>/settings/xero/connect"><?= $connected ? 'Reconnect to Xero' : 'Connect to Xero →' ?></a>
-      <?php else: ?>
-        <span class="muted small">Enter Client ID + Secret and Save, then Connect.</span>
-      <?php endif; ?>
     </div>
   </form>
-
-  <details class="xero-help">
-    <summary>How to get your Xero credentials</summary>
-    <ol class="muted small">
-      <li>Go to <strong>developer.xero.com → My Apps → New app</strong> (Web app).</li>
-      <li>Set the <strong>Redirect URI</strong> to the exact URL shown above.</li>
-      <li>Copy the <strong>Client ID</strong> and generate a <strong>Client Secret</strong>; paste both here and Save.</li>
-      <li>Click <strong>Connect to Xero</strong> and choose the organisation to link.</li>
-    </ol>
-  </details>
 </div>
 </section>
 

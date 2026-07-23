@@ -710,7 +710,7 @@ $r->get('/settings', function () {
         'configured' => XeroOAuth::isConfigured(),
         'enabled' => Settings::bool('xero.enabled'),
         'autosync_last' => Settings::raw('xero.autosync_last'),
-        'client_id' => XeroOAuth::clientId(),
+        'has_client_id' => XeroOAuth::clientId() !== '',
         'has_secret' => XeroOAuth::clientSecret() !== '',
         'redirect_uri' => XeroOAuth::redirectUri(),
         'scopes'  => XeroOAuth::scopes(),
@@ -734,8 +734,9 @@ $r->get('/settings', function () {
 $r->post('/settings/save', function () {
     Auth::requireRole('admin');
     Csrf::check();
-    Settings::set('xero.client_id', trim($_POST['client_id'] ?? ''));
-    // Only overwrite the secret when a new one is typed (blank leaves it as-is).
+    // Client ID + Secret are masked in the UI, so only overwrite them when a new
+    // value is actually typed (blank leaves the stored one untouched).
+    if (trim($_POST['client_id'] ?? '') !== '') Settings::set('xero.client_id', trim($_POST['client_id']));
     if (trim($_POST['client_secret'] ?? '') !== '') Settings::set('xero.client_secret', trim($_POST['client_secret']));
     Settings::set('xero.redirect_uri', trim($_POST['redirect_uri'] ?? ''));
     Settings::set('xero.scopes', trim($_POST['scopes'] ?? '') ?: XeroOAuth::DEFAULT_SCOPES);

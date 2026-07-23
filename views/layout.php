@@ -58,7 +58,14 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
         <a class="signout" href="<?= e($base) ?>/logout">Sign out</a>
       </div>
     </div>
-    <div class="content"><?= $content ?></div>
+    <div class="content"><?php if (!$tourOn): ?>
+      <div class="stour-tip" id="stourTip" style="display:none">
+        <span class="ti">✨</span>
+        <div class="tx"><b>First time here?</b> Take a quick guided tour — it walks you through the whole flow (requisition → approval → PO → delivery) on sample data, so nothing touches your live system. You can also start it anytime from <b>✨ Take the tour</b> in the sidebar.</div>
+        <button type="button" class="stour-btn primary" id="stourTipGo">Take the tour →</button>
+        <button type="button" class="stour-tip-x" id="stourTipX" aria-label="Dismiss">×</button>
+      </div>
+    <?php endif; ?><?= $content ?></div>
   </div>
 </div>
 
