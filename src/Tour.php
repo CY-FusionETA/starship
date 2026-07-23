@@ -47,6 +47,60 @@ final class Tour
         Db::useDemo(false);
     }
 
+    /** The live Starship WhatsApp line, read from the REAL settings even while
+     *  the request is running against the demo DB. Empty string if unset. */
+    public static function waNumber(): string
+    {
+        $wasDemo = Db::isDemo();
+        if ($wasDemo) Db::useDemo(false);
+        $n = preg_replace('/\D+/', '', (string)\App\Settings::raw('wazzup.number', ''));
+        if ($wasDemo) Db::useDemo(true);
+        return (string)$n;
+    }
+
+    /**
+     * Add a learner's phone to the REAL WhatsApp approved-sender allowlist (that
+     * table lives in the live DB, not the demo one) so their sample-DO photo gets
+     * a real reply. Toggles off demo mode for the write, then back.
+     */
+    public static function approveSender(string $phone, string $name): void
+    {
+        $wasDemo = Db::isDemo();
+        if ($wasDemo) Db::useDemo(false);
+        \App\Repo\WaSenderRepo::add($phone, $name);
+        if ($wasDemo) Db::useDemo(true);
+    }
+
+    /**
+     * Drop the sample delivery straight into the demo DB — the "no phone needed"
+     * path so the tour's receive/match step works even when the learner's number
+     * isn't an approved WhatsApp sender. Idempotent: only one sample DO exists.
+     * Runs inside the request's existing demo-DB context.
+     */
+    public static function addSampleDelivery(): int
+    {
+        $existing = Db::scalar("SELECT id FROM delivery_orders WHERE do_number = ?", ['DO-DEMO-7781']);
+        if ($existing) return (int)$existing;
+
+        $sup = \App\Repo\SupplierRepo::matchByName(self::SUPPLIER);
+        $doId = \App\Repo\DeliveryOrderRepo::create([
+            'do_number'         => 'DO-DEMO-7781',
+            'po_reference_raw'  => self::PO_NUMBER,
+            'project_code_raw'  => self::PROJECT_CODE,
+            'delivery_date'     => date('Y-m-d'),
+            'signature_present' => 1,
+            'image_path'        => 'tour/tour-sample-do.jpg',
+            'source_channel'    => 'tour_sample',
+            'supplier_id'       => $sup['id'] ?? null,
+        ], [
+            ['ocr_description' => 'CO2 Fire Extinguisher 5kg', 'ocr_supplier_code' => '', 'ocr_qty' => 10, 'ocr_uom' => 'UNIT'],
+            ['ocr_description' => 'Pressure Gauge 0-300 Bar',  'ocr_supplier_code' => '', 'ocr_qty' => 12, 'ocr_uom' => 'PCS'],
+            ['ocr_description' => 'Galvanised U-Bolt M12',     'ocr_supplier_code' => '', 'ocr_qty' => 50, 'ocr_uom' => 'PCS'],
+        ]);
+        try { \App\Service\MatchingService::suggest($doId); } catch (\Throwable $e) { /* best-effort */ }
+        return $doId;
+    }
+
     /**
      * Does this OCR result look like the training sample DO? If so the WhatsApp
      * intake stores it in the demo DB instead of production.

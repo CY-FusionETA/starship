@@ -53,8 +53,15 @@
 .stour-btn.primary:hover{background:#4338ca}
 .stour-btn.ghost{background:transparent;color:#6b7280}
 .stour-btn.ghost:hover{color:#111827}
-.stour-btn.sample{background:#0ea5e9;color:#fff;width:100%;margin-top:.2rem}
+.stour-btn.sample{background:#0ea5e9;color:#fff;width:100%;margin-top:.4rem}
 .stour-btn.sample:hover{background:#0284c7}
+.stour-approve{margin-top:.5rem;padding:.55rem .6rem;background:#f5f7ff;border:1px solid #e0e5f5;border-radius:10px}
+.stour-approve-h{font-weight:700;font-size:.82rem;color:#3730a3;margin-bottom:.35rem}
+.stour-inp{width:100%;box-sizing:border-box;padding:.4rem .55rem;margin-bottom:.3rem;border:1px solid #cbd2e6;border-radius:7px;font-size:.85rem;font-family:inherit}
+.stour-inp:focus{outline:none;border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+.stour-msg{font-size:.8rem;margin-top:.35rem;line-height:1.4}
+.stour-msg.ok{color:#166534}
+.stour-msg.err{color:#b91c1c}
 
 /* Spotlight ring on a highlighted element */
 .stour-spot{position:relative;z-index:998 !important;outline:3px solid #7c3aed;outline-offset:3px;border-radius:8px;box-shadow:0 0 0 9999px rgba(15,23,42,.45);transition:outline-color .2s}

@@ -95,6 +95,28 @@ $r->post('/tour/exit', function () {
     \App\Tour::exit();
     Response::redirect('/');
 });
+// "No phone needed" — drop the sample delivery into the demo DB so the
+// receive/match step works without an approved WhatsApp sender.
+$r->post('/tour/sample-do', function () {
+    Auth::require();
+    Csrf::check();
+    if (\App\Tour::active()) \App\Tour::addSampleDelivery();
+    Response::redirect('/delivery-orders');
+});
+// Learner self-approves their phone so the real WhatsApp send replies to them.
+// Only inside a tour; adds to the live approved-sender allowlist.
+$r->post('/tour/add-sender', function () {
+    Auth::require();
+    Csrf::check();
+    if (!\App\Tour::active()) Response::json(['ok' => false, 'error' => 'Training Mode only.']);
+    $phone = trim($_POST['phone'] ?? '');
+    $name  = trim($_POST['name'] ?? '');
+    if (\App\Repo\WaSenderRepo::normalize($phone) === '') {
+        Response::json(['ok' => false, 'error' => 'Enter a valid number, e.g. 60123456789.']);
+    }
+    \App\Tour::approveSender($phone, $name ?: 'Trainee');
+    Response::json(['ok' => true, 'phone' => \App\Repo\WaSenderRepo::normalize($phone)]);
+});
 
 // --- Auth -----------------------------------------------------------
 $r->get('/login', function () {

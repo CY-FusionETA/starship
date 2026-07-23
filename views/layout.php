@@ -125,7 +125,8 @@ window.STARSHIP_TOUR = {
   active: <?= $tourOn ? 'true' : 'false' ?>,
   base: <?= json_encode($base) ?>,
   csrf: <?= json_encode(\App\Csrf::token()) ?>,
-  sampleDo: <?= json_encode($base . '/public/img/tour-sample-do.jpg') ?>
+  sampleDo: <?= json_encode($base . '/public/img/tour-sample-do.jpg') ?>,
+  waNumber: <?= json_encode($tourOn ? \App\Tour::waNumber() : '') ?>
 };
 </script>
 <script src="<?= e($base) ?>/public/js/tour.js?v=<?= @filemtime(APP_ROOT . '/public/js/tour.js') ?: '1' ?>"></script>
