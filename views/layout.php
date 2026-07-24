@@ -13,6 +13,9 @@ $nav = function (string $href, string $label, string $icon, ?int $badge = null) 
     echo '<a class="' . $active . '" href="' . e($base . $href) . '">' . $icon . ' <span>' . e($label) . '</span>' . $b . '</a>';
 };
 $isAdmin = Auth::isAdmin();
+// The owner account is a system/oversight login, not a procurement one: it gets
+// Settings + Access log and none of the requisition→PO→delivery workflow.
+$isOwner = Auth::isOwner();
 $canApprove = Perm::can('mr_approve');
 // The pending badge counts only what this user could actually approve.
 $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
@@ -35,18 +38,20 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
     <div class="brand"><span class="logo">St</span> <span>Starship</span></div>
     <div class="tag">Procure</div>
     <nav>
-      <?php $nav('/', 'Dashboard', Icons::svg('dashboard')); ?>
-      <?php if ($canApprove) $nav('/approvals', 'Approvals', Icons::svg('approvals'), $pending ?: null); ?>
-      <?php $nav('/requisitions', 'Requisitions', Icons::svg('requisitions')); ?>
-      <?php // Requesters do see POs and DOs for their projects — just not the money on them. ?>
-      <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
-      <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
-      <?php $nav('/pitch', 'How it works', Icons::svg('spark')); ?>
-      <?php if (!$tourOn): ?><a href="#" onclick="starshipTourStart();return false;" title="A guided 7-minute walkthrough on sample data">✨ <span>Take the tour</span></a><?php endif; ?>
+      <?php if (!$isOwner): ?>
+        <?php $nav('/', 'Dashboard', Icons::svg('dashboard')); ?>
+        <?php if ($canApprove) $nav('/approvals', 'Approvals', Icons::svg('approvals'), $pending ?: null); ?>
+        <?php $nav('/requisitions', 'Requisitions', Icons::svg('requisitions')); ?>
+        <?php // Requesters do see POs and DOs for their projects — just not the money on them. ?>
+        <?php $nav('/purchase-orders', 'Purchase Orders', Icons::svg('po')); ?>
+        <?php $nav('/delivery-orders', 'Delivery Orders', Icons::svg('delivery')); ?>
+        <?php $nav('/pitch', 'How it works', Icons::svg('spark')); ?>
+        <?php if (!$tourOn): ?><a href="#" onclick="starshipTourStart();return false;" title="A guided 7-minute walkthrough on sample data">✨ <span>Take the tour</span></a><?php endif; ?>
+      <?php endif; ?>
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
         <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>
-        <?php if (Auth::isOwner()) $nav('/access-log', 'Access log', '🔒'); ?>
+        <?php if ($isOwner) $nav('/access-log', 'Access log', '🔒'); ?>
       <?php endif; ?>
     </nav>
   </aside>
@@ -59,7 +64,7 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
         <a class="signout" href="<?= e($base) ?>/logout">Sign out</a>
       </div>
     </div>
-    <div class="content"><?php if (!$tourOn): ?>
+    <div class="content"><?php if (!$tourOn && !$isOwner): ?>
       <div class="stour-tip" id="stourTip" style="display:none">
         <span class="ti">✨</span>
         <div class="tx"><b>First time here?</b> Take a quick guided tour — it walks you through the whole flow (requisition → approval → PO → delivery) on sample data, so nothing touches your live system. You can also start it anytime from <b>✨ Take the tour</b> in the sidebar.</div>

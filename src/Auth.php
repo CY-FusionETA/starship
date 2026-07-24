@@ -53,11 +53,23 @@ final class Auth
      * log, even above other admins. Defaults to Simon; override with
      * config app.owner_email.
      */
+    public static function ownerEmail(): string
+    {
+        return strtolower(trim((string)cfg('app.owner_email', 'simon@fusioneta.com')));
+    }
+
     public static function isOwner(): bool
     {
-        $owner = strtolower(trim((string)cfg('app.owner_email', 'simon@fusioneta.com')));
+        $owner = self::ownerEmail();
         $email = strtolower(trim((string)($_SESSION['email'] ?? '')));
         return $owner !== '' && $email === $owner;
+    }
+
+    /** Is this email the owner account? Used to keep it out of the user list. */
+    public static function isOwnerEmail(?string $email): bool
+    {
+        $owner = self::ownerEmail();
+        return $owner !== '' && strtolower(trim((string)$email)) === $owner;
     }
 
     public static function check(): bool { return !empty($_SESSION['uid']); }

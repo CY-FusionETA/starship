@@ -17,22 +17,51 @@ final class UserRepo
         return Db::one("SELECT * FROM users WHERE id = ?", [$id]);
     }
 
+    /**
+     * Like find(), but returns null when a non-owner asks for the owner row —
+     * so the account can't be reached by guessing its id.
+     */
+    public static function findVisible(int $id): ?array
+    {
+        $u = self::find($id);
+        if ($u && !Auth::isOwner() && Auth::isOwnerEmail($u['email'] ?? null)) return null;
+        return $u;
+    }
+
+    /** True if the current user may edit/deactivate this account. */
+    public static function mayManage(int $id): bool
+    {
+        return self::findVisible($id) !== null;
+    }
+
     public static function findByEmail(string $email): ?array
     {
         return Db::one("SELECT * FROM users WHERE email = ?", [self::normalizeEmail($email)]);
     }
 
-    /** All users with their project count + names, for the Settings list. */
+    /**
+     * All users with their project count + names, for the Settings list.
+     *
+     * The owner account is deliberately omitted for everyone except the owner
+     * themselves — it is the account that holds the sign-in audit log, so other
+     * admins shouldn't see it exists, let alone be able to edit or deactivate
+     * it. Hiding it here is only the cosmetic half; the /settings/users/* routes
+     * enforce the same rule so it can't be reached by guessing the id.
+     */
     public static function all(): array
     {
         $users = Db::all(
             "SELECT u.*, (SELECT COUNT(*) FROM user_projects up WHERE up.user_id = u.id) AS project_count
              FROM users u ORDER BY u.is_active DESC, u.name"
         );
-        foreach ($users as &$u) {
+        $hideOwner = !Auth::isOwner();
+        $out = [];
+        foreach ($users as $u) {
+            if ($hideOwner && Auth::isOwnerEmail($u['email'] ?? null)) continue;
             $u['projects'] = Perm::seesAllProjects($u['role']) ? [] : self::projects((int)$u['id']);
+            $out[] = $u;
         }
-        return $users;
+        return $out;
     }
 
     /** Project ids this user is assigned to. */

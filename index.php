@@ -147,6 +147,9 @@ $r->get('/access-log', function () {
 // --- Dashboard ------------------------------------------------------
 $r->get('/', function () {
     Auth::require();
+    // The owner is an oversight login with no procurement nav — send it straight
+    // to Settings rather than a dashboard full of requisition activity.
+    if (Auth::isOwner()) Response::redirect('/settings');
     $uid = (int)(Auth::id() ?? 0);
     $isAdmin = Auth::isAdmin();
     Response::view('dashboard', [
@@ -738,8 +741,11 @@ $r->get('/settings', function () {
         'senders'       => WaSenderRepo::all(),
         'users'         => UserRepo::all(),
         'allProjects'   => ProjectRepo::all(),
-        'editUser'      => isset($_GET['user']) ? UserRepo::find((int)$_GET['user']) : null,
-        'editProjects'  => isset($_GET['user']) ? UserRepo::projectIds((int)$_GET['user']) : [],
+        // ?user=<id> opens the edit form. The owner row is invisible to other
+        // admins in the list, so it must be unreachable by id here too.
+        'editUser'      => isset($_GET['user']) ? UserRepo::findVisible((int)$_GET['user']) : null,
+        'editProjects'  => isset($_GET['user']) && UserRepo::findVisible((int)$_GET['user'])
+                             ? UserRepo::projectIds((int)$_GET['user']) : [],
         'notice'  => $_GET['ok'] ?? null,
         'error'   => $_GET['err'] ?? null,
     ], 'Settings');
@@ -825,6 +831,9 @@ $r->post('/settings/senders/{id}/delete', function ($p) {
 $r->post('/settings/users/add', function () {
     Auth::requireRole('admin');
     Csrf::check();
+    // Nobody but the owner may create an account carrying the owner email —
+    // otherwise an admin could mint themselves access to the sign-in audit log.
+    if (!Auth::isOwner() && Auth::isOwnerEmail($_POST['email'] ?? null)) Response::notFound();
     [$id, $err] = UserRepo::create($_POST, $_POST['projects'] ?? []);
     if ($err) Response::redirect('/settings?err=' . rawurlencode($err) . '#users');
     Response::redirect('/settings?ok=' . rawurlencode('User ' . trim($_POST['name'] ?? '') . ' created.') . '#users');
@@ -832,6 +841,10 @@ $r->post('/settings/users/add', function () {
 $r->post('/settings/users/{id}/save', function ($p) {
     Auth::requireRole('admin');
     Csrf::check();
+    // The owner row is invisible to other admins — it must not be editable by
+    // id either, nor may anyone else rename an account onto the owner email.
+    if (!UserRepo::mayManage((int)$p['id'])) Response::notFound();
+    if (!Auth::isOwner() && Auth::isOwnerEmail($_POST['email'] ?? null)) Response::notFound();
     $err = UserRepo::update((int)$p['id'], $_POST, $_POST['projects'] ?? []);
     if ($err) Response::redirect('/settings?user=' . (int)$p['id'] . '&err=' . rawurlencode($err) . '#users');
     Response::redirect('/settings?ok=' . rawurlencode('User updated.') . '#users');
@@ -839,6 +852,9 @@ $r->post('/settings/users/{id}/save', function ($p) {
 $r->post('/settings/users/{id}/active', function ($p) {
     Auth::requireRole('admin');
     Csrf::check();
+    // Without this another admin could deactivate the owner by id and lock the
+    // audit log away from everyone.
+    if (!UserRepo::mayManage((int)$p['id'])) Response::notFound();
     $active = !empty($_POST['active']);
     $err = UserRepo::setActive((int)$p['id'], $active);
     if ($err) Response::redirect('/settings?err=' . rawurlencode($err) . '#users');
