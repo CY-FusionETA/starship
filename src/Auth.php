@@ -23,9 +23,10 @@ final class Auth
         $u = Db::one("SELECT * FROM users WHERE email = ? AND is_active = 1", [strtolower(trim($email))]);
         if (!$u || !password_verify($password, $u['password_hash'])) return false;
         session_regenerate_id(true);
-        $_SESSION['uid']  = (int)$u['id'];
-        $_SESSION['role'] = $u['role'];
-        $_SESSION['name'] = $u['name'];
+        $_SESSION['uid']   = (int)$u['id'];
+        $_SESSION['role']  = $u['role'];
+        $_SESSION['name']  = $u['name'];
+        $_SESSION['email'] = $u['email'];
         Db::update('users', (int)$u['id'], ['last_login_at' => date('Y-m-d H:i:s')]);
         return true;
     }
@@ -40,10 +41,23 @@ final class Auth
     public static function refresh(): void
     {
         if (empty($_SESSION['uid'])) return;
-        $u = Db::one("SELECT role, name, is_active FROM users WHERE id = ?", [(int)$_SESSION['uid']]);
+        $u = Db::one("SELECT role, name, email, is_active FROM users WHERE id = ?", [(int)$_SESSION['uid']]);
         if (!$u || (int)$u['is_active'] !== 1) { self::logout(); return; }
-        $_SESSION['role'] = $u['role'];
-        $_SESSION['name'] = $u['name'];
+        $_SESSION['role']  = $u['role'];
+        $_SESSION['name']  = $u['name'];
+        $_SESSION['email'] = $u['email'];
+    }
+
+    /**
+     * The single owner account — the only one allowed to see the sign-in audit
+     * log, even above other admins. Defaults to Simon; override with
+     * config app.owner_email.
+     */
+    public static function isOwner(): bool
+    {
+        $owner = strtolower(trim((string)cfg('app.owner_email', 'simon@fusioneta.com')));
+        $email = strtolower(trim((string)($_SESSION['email'] ?? '')));
+        return $owner !== '' && $email === $owner;
     }
 
     public static function check(): bool { return !empty($_SESSION['uid']); }

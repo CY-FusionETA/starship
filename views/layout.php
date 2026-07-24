@@ -46,6 +46,7 @@ $pending = $canApprove ? RequisitionRepo::pendingCount() : 0;
       <?php if ($isAdmin): ?>
         <div class="tag">System</div>
         <?php $nav('/settings', 'Settings', Icons::svg('settings')); ?>
+        <?php if (Auth::isOwner()) $nav('/access-log', 'Access log', '🔒'); ?>
       <?php endif; ?>
     </nav>
   </aside>

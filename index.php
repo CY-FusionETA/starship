@@ -125,11 +125,24 @@ $r->get('/login', function () {
 });
 $r->post('/login', function () {
     Csrf::check();
-    $ok = Auth::attempt($_POST['email'] ?? '', $_POST['password'] ?? '');
+    $email = (string)($_POST['email'] ?? '');
+    $ok = Auth::attempt($email, $_POST['password'] ?? '');
+    // Audit every attempt (success + failed) with IP / location / device.
+    \App\Repo\LoginEventRepo::record($ok ? Auth::id() : null, $email, $ok);
     if ($ok) Response::redirect('/');
     Response::partial('auth/login', ['error' => 'Invalid email or password.']);
 });
 $r->get('/logout', function () { Auth::logout(); Response::redirect('/login'); });
+
+// --- Access log (OWNER ONLY — not other admins) ---------------------
+$r->get('/access-log', function () {
+    Auth::require();
+    if (!Auth::isOwner()) Response::notFound();   // 404 so its existence isn't revealed
+    Response::view('access_log', [
+        'events' => \App\Repo\LoginEventRepo::recent(200),
+        'stats'  => \App\Repo\LoginEventRepo::stats(),
+    ], 'Access log');
+});
 
 // --- Dashboard ------------------------------------------------------
 $r->get('/', function () {
