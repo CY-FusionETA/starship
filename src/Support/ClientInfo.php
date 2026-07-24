@@ -6,10 +6,23 @@ namespace App\Support;
 /** Best-effort client IP + a light user-agent parser for the sign-in audit log. */
 final class ClientInfo
 {
-    /** Real client IP, looking through common proxy/CDN headers first. */
+    /**
+     * Real client IP.
+     *
+     * REMOTE_ADDR is the only value we can trust: proxy headers are just request
+     * headers, so anyone can send "X-Real-IP: 8.8.8.8" and forge their own entry
+     * in the audit log. We therefore consult those headers ONLY when the request
+     * actually reached us from a trusted proxy (loopback/private, i.e. a local
+     * reverse proxy). Today nginx talks to PHP-FPM directly with no proxy in
+     * front, so this resolves to REMOTE_ADDR — the headers become meaningful
+     * again automatically if a proxy is ever put in front.
+     */
     public static function ip(): string
     {
-        // Cloudflare / common reverse-proxy headers (cPanel often sits behind one).
+        $remote = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+
+        if (!self::isTrustedProxy($remote)) return $remote;
+
         foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP'] as $h) {
             $v = $_SERVER[$h] ?? '';
             if (is_string($v) && filter_var($v, FILTER_VALIDATE_IP)) return $v;
@@ -19,8 +32,20 @@ final class ClientInfo
             $first = trim(explode(',', $xff)[0]);
             if (filter_var($first, FILTER_VALIDATE_IP)) return $first;
         }
-        $ra = $_SERVER['REMOTE_ADDR'] ?? '';
-        return is_string($ra) ? $ra : '';
+        return $remote;
+    }
+
+    /** Only a loopback/private peer may speak for someone else's IP. */
+    private static function isTrustedProxy(string $ip): bool
+    {
+        if ($ip === '') return false;
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) return false;
+
+        return !filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        );
     }
 
     public static function ua(): string
