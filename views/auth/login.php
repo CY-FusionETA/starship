@@ -6,7 +6,8 @@ $base = rtrim(parse_url(cfg('app.base_url', ''), PHP_URL_PATH) ?? '', '/');
 // Password defaults to demo123; accounts added later use their own.
 $demoUsers = [
     // Labels track the account's real role — see App\Perm::LABELS.
-    ['email' => 'superadmin@fusioneta.com', 'name' => 'Superadmin', 'role' => 'Superadmin', 'initials' => 'SA', 'password' => 'demodemo123'],
+    // NOTE: never list an admin/superadmin account here — these buttons embed
+    // the password in the public page source, so anyone could sign in as it.
     ['email' => 'procurement@fusioneta.com', 'name' => 'Procurement', 'role' => 'Procurement', 'initials' => 'PR'],
     ['email' => 'pm@fusioneta.com',     'name' => 'Project Manager', 'role' => 'Project Manager', 'initials' => 'PM', 'password' => 'demodemo123'],
     ['email' => 'finance@fusioneta.com', 'name' => 'Finance', 'role' => 'Finance', 'initials' => 'FI', 'password' => 'demodemo123'],
