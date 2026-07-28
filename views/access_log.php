@@ -1,4 +1,11 @@
 <?php /** @var array $events @var array $stats */
+// login_events.created_at is stamped by SQLite's CURRENT_TIMESTAMP, which is
+// UTC — convert to the app timezone (Asia/Kuala_Lumpur) for display.
+$fmtWhen = function (?string $utc): string {
+    if (!$utc) return '—';
+    $ts = strtotime($utc . ' UTC');
+    return $ts ? date('Y-m-d H:i:s', $ts) : $utc;
+};
 $fmtLoc = function (array $e): string {
     if (\App\Service\GeoIp::isPrivate((string)($e['ip'] ?? ''))) return '<span class="muted">local / private</span>';
     $bits = array_filter([$e['city'] ?? '', $e['country'] ?? '']);
@@ -43,7 +50,7 @@ $fmtDevice = function (array $e): string {
       <tr><td colspan="6" class="empty-cell">No sign-ins recorded yet.</td></tr>
     <?php else: foreach ($events as $e): ?>
       <tr>
-        <td class="muted small" style="white-space:nowrap"><?= e($e['created_at']) ?></td>
+        <td class="muted small" style="white-space:nowrap"><?= e($fmtWhen($e['created_at'])) ?></td>
         <td>
           <?php if (!empty($e['user_name'])): ?>
             <strong><?= e($e['user_name']) ?></strong>

@@ -61,7 +61,8 @@ final class LoginEventRepo
             'failed'   => (int)Db::scalar("SELECT COUNT(*) FROM login_events WHERE success = 0"),
             'accounts' => (int)Db::scalar("SELECT COUNT(DISTINCT user_id) FROM login_events WHERE user_id IS NOT NULL"),
             'ips'      => (int)Db::scalar("SELECT COUNT(DISTINCT ip) FROM login_events WHERE ip IS NOT NULL AND ip != ''"),
-            'last24'   => (int)Db::scalar("SELECT COUNT(*) FROM login_events WHERE created_at >= ?", [date('Y-m-d H:i:s', time() - 86400)]),
+            // created_at is SQLite CURRENT_TIMESTAMP (UTC) — compare in UTC.
+            'last24'   => (int)Db::scalar("SELECT COUNT(*) FROM login_events WHERE created_at >= ?", [gmdate('Y-m-d H:i:s', time() - 86400)]),
         ];
     }
 }
